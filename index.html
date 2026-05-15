@@ -2330,6 +2330,54 @@ function renderLeaderboard(scores) {
   el.innerHTML = html;
 }
 
+// ── RESET FUNCTIONS ───────────────────────────
+async function resetGameScores() {
+  if (!confirm('Reset ALL game scores? This cannot be undone.')) return;
+  localStorage.removeItem('tlr_played');
+  if (window._firebaseReady) {
+    const { collection, getDocs, deleteDoc, doc } = window._firebase;
+    const snap = await getDocs(collection(window._db, 'game_scores'));
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'game_scores', d.id))));
+  }
+  window._lastGameScores = [];
+  renderLeaderboard([]);
+  showToast('Game scores reset ✓');
+}
+
+async function resetAllAwards() {
+  if (!confirm('Reset ALL bonus awards? This cannot be undone.')) return;
+  localStorage.removeItem('tlr_awards');
+  window._cachedAwards = [];
+  if (window._firebaseReady) {
+    const { collection, getDocs, deleteDoc, doc } = window._firebase;
+    const snap = await getDocs(collection(window._db, 'bonus_awards'));
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'bonus_awards', d.id))));
+  }
+  renderLeaderboard([]);
+  showToast('Awards reset ✓');
+}
+
+async function resetEverything() {
+  if (!confirm('Reset ALL scores AND awards? This wipes the entire leaderboard.')) return;
+  localStorage.removeItem('tlr_played');
+  localStorage.removeItem('tlr_awards');
+  window._lastGameScores = [];
+  window._cachedAwards = [];
+  if (window._firebaseReady) {
+    const { collection, getDocs, deleteDoc, doc } = window._firebase;
+    const [scoreSnap, awardSnap] = await Promise.all([
+      getDocs(collection(window._db, 'game_scores')),
+      getDocs(collection(window._db, 'bonus_awards'))
+    ]);
+    await Promise.all([
+      ...scoreSnap.docs.map(d => deleteDoc(doc(window._db, 'game_scores', d.id))),
+      ...awardSnap.docs.map(d => deleteDoc(doc(window._db, 'bonus_awards', d.id)))
+    ]);
+  }
+  renderLeaderboard([]);
+  showToast('🚨 Everything reset');
+}
+
 // ── HELPERS ──────────────────────────────────
 function showLogoutMenu() {
   if (confirm('Switch user? This will take you back to the name screen.')) {
@@ -2606,7 +2654,14 @@ function renderAdminTab(tab) {
     body += '</div></div>';
 
     body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">Day 1 - Trivia Questions</div>';
+    body += '<div class="admin-section-title">⚠️ Reset Scores</div>';
+    body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Wipes all game scores and bonus awards. Use before starting fresh or for testing.</div>';
+    body += '<div style="display:flex;gap:8px;">';
+    body += '<button class="submit-btn" onclick="resetGameScores()" style="background:rgba(192,80,58,0.2);border:1px solid rgba(192,80,58,0.5);color:#e05a4a;flex:1;">Reset Game Scores</button>';
+    body += '<button class="submit-btn" onclick="resetAllAwards()" style="background:rgba(192,80,58,0.2);border:1px solid rgba(192,80,58,0.5);color:#e05a4a;flex:1;">Reset All Awards</button>';
+    body += '</div>';
+    body += '<button class="submit-btn" onclick="resetEverything()" style="background:rgba(192,80,58,0.35);border:1px solid rgba(192,80,58,0.7);color:#ff6b55;margin-top:8px;width:100%;">🚨 Reset Everything</button>';
+    body += '</div>';
     body += '<div id="admin-q-list-0" style="margin-bottom:8px;"></div>';
     body += '<div style="background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);">';
     body += '<input class="text-input" id="q0-text" placeholder="Question">';
