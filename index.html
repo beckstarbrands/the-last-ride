@@ -975,7 +975,6 @@ function switchTab(tab) {
   document.getElementById('nav-' + tab).classList.add('active');
   if (tab === 'agenda') renderAgenda(currentDay);
   if (tab === 'leaderboard') {
-    // Always re-read awards from localStorage so it's fresh
     window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
     renderLeaderboard(window._lastGameScores || []);
   }
@@ -2131,19 +2130,27 @@ async function giveAward() {
   if (!name || !reason || isNaN(pts) || pts === 0) { showToast('Fill in all fields (use - for deductions)'); return; }
 
   const award = { id: 'award_'+Date.now(), name, reason, pts, type:'bonus', ts: Date.now() };
-  saveAwardLocally(award);
+
+  // Save directly — bypass saveAwardLocally to avoid any race
+  const stored = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
+  stored.push(award);
+  localStorage.setItem('tlr_awards', JSON.stringify(stored));
+  window._cachedAwards = stored;
 
   document.getElementById('award-name').value = '';
   document.getElementById('award-reason').value = '';
   document.getElementById('award-pts').value = '';
 
-  showAwardConfirm(`✅ ${pts} pts awarded to ${name} for "${reason}"`);
-  renderLeaderboard(window._lastGameScores || []);
+  showAwardConfirm(`✅ ${pts > 0 ? '+' : ''}${pts} pts → ${name} for "${reason}"`);
   loadAwardHistory();
+
+  // Force leaderboard re-render with latest everything
+  const lb = document.getElementById('leaderboard-full');
+  if (lb) renderLeaderboard(window._lastGameScores || []);
 
   if (window._firebaseReady) {
     const { collection, addDoc, serverTimestamp } = window._firebase;
-    await addDoc(collection(window._db, 'bonus_awards'), { name, reason, pts, type:'bonus', ts: serverTimestamp() });
+    await addDoc(collection(window._db, 'bonus_awards'), { name, reason, pts, type:'bonus', ts: serverTimestamp() }).catch(()=>{});
   }
 }
 
@@ -2713,27 +2720,11 @@ function renderAdminTab(tab) {
     body += '<div id="award-confirm" style="display:none;background:rgba(40,120,60,0.25);border:1px solid rgba(60,180,80,0.4);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#7de89a;line-height:1.5;"></div>';
     body += '<div class="admin-section">';
     body += '<div class="admin-section-title">🌟 Award Bonus Points</div>';
-    body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Al D awards points for anything — pickleball champ, most food eaten, best speech. Shows on leaderboard.</div>';
+    body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Award points for anything — pickleball champ, best dive, most food eaten, quote of the day, photo of the day. Shows on leaderboard immediately.</div>';
     body += '<select class="text-input" id="award-name"><option value="">Select person...</option>' + CREW.map(n => '<option value="'+n+'">'+n+'</option>').join('') + '</select>';
     body += '<input class="text-input" id="award-reason" placeholder="Reason (e.g. Pickleball Champ 🏆)">';
-    body += '<input class="text-input" id="award-pts" placeholder="Points (e.g. 500 or -200)" type="number">';
+    body += '<input class="text-input" id="award-pts" placeholder="Points (e.g. 500 or -200 to deduct)" type="number">';
     body += '<button class="submit-btn" onclick="giveAward()">Award Points</button>';
-    body += '</div>';
-
-    body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">📸 Photo of the Day</div>';
-    body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Pick today\'s winning photo. Awards 1,000 pts to the uploader.</div>';
-    body += '<select class="text-input" id="potd-name"><option value="">Select person...</option>' + CREW.map(n => '<option value="'+n+'">'+n+'</option>').join('') + '</select>';
-    body += '<input class="text-input" id="potd-caption" placeholder="Caption (optional)">';
-    body += '<button class="submit-btn" onclick="givePhotoOfDay()">Award Photo of the Day</button>';
-    body += '</div>';
-
-    body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">💬 Quote of the Day</div>';
-    body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Pick today\'s best quote. Awards 750 pts to the author.</div>';
-    body += '<select class="text-input" id="qotd-name"><option value="">Select person...</option>' + CREW.map(n => '<option value="'+n+'">'+n+'</option>').join('') + '</select>';
-    body += '<input class="text-input" id="qotd-text" placeholder="The quote">';
-    body += '<button class="submit-btn" onclick="giveQuoteOfDay()">Award Quote of the Day</button>';
     body += '</div>';
 
     body += '<div class="admin-section">';
