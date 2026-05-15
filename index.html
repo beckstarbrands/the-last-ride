@@ -923,7 +923,7 @@ function onAppReady() {
     localStorage.setItem('tlr_awards', JSON.stringify(cleanAwards));
   }
   window._cachedAwards = cleanAwards;
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   loadFromFirebase();
   if (currentUser) {
     const el = document.getElementById('header-user');
@@ -2138,7 +2138,7 @@ async function giveAward() {
   document.getElementById('award-pts').value = '';
 
   showAwardConfirm(`✅ ${pts} pts awarded to ${name} for "${reason}"`);
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   loadAwardHistory();
 
   if (window._firebaseReady) {
@@ -2160,7 +2160,7 @@ async function givePhotoOfDay() {
   document.getElementById('potd-caption').value = '';
 
   showAwardConfirm(`✅ 1,000 pts awarded to ${name} — 📸 Photo of the Day!`);
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   loadAwardHistory();
 
   if (window._firebaseReady) {
@@ -2182,7 +2182,7 @@ async function giveQuoteOfDay() {
   document.getElementById('qotd-text').value = '';
 
   showAwardConfirm(`✅ 750 pts awarded to ${name} — 💬 Quote of the Day!`);
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   loadAwardHistory();
 
   if (window._firebaseReady) {
@@ -2235,24 +2235,29 @@ function deleteAward(id) {
   const stored = JSON.parse(localStorage.getItem('tlr_awards') || '[]').filter(a => a.id !== id);
   localStorage.setItem('tlr_awards', JSON.stringify(stored));
   window._cachedAwards = stored;
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   loadAwardHistory();
   showToast('Award removed');
 }
 
 // ── LEADERBOARD (game + bonus combined) ──────
 function renderLeaderboard(scores) {
-  const el = document.getElementById('leaderboard-full');
-  if (!el) return;
+  // Always cache the latest game scores passed in
+  if (scores && scores.length) window._lastGameScores = scores;
 
-  // Always read fresh from localStorage — source of truth for awards
-  const freshAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
-  window._cachedAwards = freshAwards;
+  // Always read fresh awards from localStorage
+  window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
+
+  // Use cached scores if none passed
+  const resolvedScores = (scores && scores.length) ? scores : (window._lastGameScores || []);
+
+  const el = document.getElementById('leaderboard-full');
+  if (!el) return; // leaderboard tab not in view, skip render
 
   const totals = {};
   CREW.forEach(name => { totals[name] = { name, avatar: CREW_EMOJI[name] || '', gameTotal: 0, bonusTotal: 0, awards: [] }; });
 
-  scores.forEach(s => {
+  resolvedScores.forEach(s => {
     const key = CREW.find(n => n === s.name) || null;
     if (!key) return;
     totals[key].gameTotal += s.score || 0;
@@ -2340,7 +2345,7 @@ async function resetGameScores() {
     await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'game_scores', d.id))));
   }
   window._lastGameScores = [];
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   showToast('Game scores reset ✓');
 }
 
@@ -2353,7 +2358,7 @@ async function resetAllAwards() {
     const snap = await getDocs(collection(window._db, 'bonus_awards'));
     await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'bonus_awards', d.id))));
   }
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   showToast('Awards reset ✓');
 }
 
@@ -2374,7 +2379,7 @@ async function resetEverything() {
       ...awardSnap.docs.map(d => deleteDoc(doc(window._db, 'bonus_awards', d.id)))
     ]);
   }
-  renderLeaderboard([]);
+  renderLeaderboard(window._lastGameScores || []);
   showToast('🚨 Everything reset');
 }
 
