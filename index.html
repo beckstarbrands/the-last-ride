@@ -2124,7 +2124,8 @@ const CREW_EMOJI = {
 
 // ── AWARDS ───────────────────────────────────
 async function giveAward() {
-  const name = document.getElementById('award-name').value.trim();
+  const nameIdx = document.getElementById('award-name').value;
+  const name = nameIdx !== '' ? CREW[parseInt(nameIdx)] : '';
   const reason = document.getElementById('award-reason').value.trim();
   const pts = parseInt(document.getElementById('award-pts').value);
   if (!name || !reason || isNaN(pts) || pts === 0) { showToast('Fill in all fields (use - for deductions)'); return; }
@@ -2721,7 +2722,7 @@ function renderAdminTab(tab) {
     body += '<div class="admin-section">';
     body += '<div class="admin-section-title">🌟 Award Bonus Points</div>';
     body += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Award points for anything — pickleball champ, best dive, most food eaten, quote of the day, photo of the day. Shows on leaderboard immediately.</div>';
-    body += '<select class="text-input" id="award-name"><option value="">Select person...</option>' + CREW.map(n => '<option value="'+n+'">'+n+'</option>').join('') + '</select>';
+    body += '<select class="text-input" id="award-name"><option value="">Select person...</option>' + CREW.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('') + '</select>';
     body += '<input class="text-input" id="award-reason" placeholder="Reason (e.g. Pickleball Champ 🏆)">';
     body += '<input class="text-input" id="award-pts" placeholder="Points (e.g. 500 or -200 to deduct)" type="number">';
     body += '<button class="submit-btn" onclick="giveAward()">Award Points</button>';
