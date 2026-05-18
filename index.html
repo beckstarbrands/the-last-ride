@@ -1475,7 +1475,7 @@ function renderGameTab() {
 
 // ── DAY 1: TRIVIA ────────────────────────────
 function renderDay1(container) {
-  const qs = (triviaQuestions[0] || []).sort((a,b) => (a.order||99) - (b.order||99));
+  const qs = HARDCODED_DAY1.sort((a,b) => (a.order||99) - (b.order||99));
   if (!qs.length) {
     container.innerHTML = `
       <div class="game-header">
@@ -1530,7 +1530,7 @@ function renderDay1(container) {
 }
 
 function startDay1Game() {
-  const qs = (triviaQuestions[0] || []).sort((a,b) => (a.order||99) - (b.order||99));
+  const qs = HARDCODED_DAY1.sort((a,b) => (a.order||99) - (b.order||99));
   const container = document.getElementById('game-container');
   triviaState = { day: 0, questions: qs, current: 0, correct: 0, startTime: null, answered: false };
   container.innerHTML = `
@@ -2093,7 +2093,19 @@ function hasPlayedToday() {
   return !!played[currentUser.name + '_day' + getGameDay()];
 }
 
-// ── CREW LIST ────────────────────────────────
+// ── HARDCODED GAME QUESTIONS ─────────────────
+const HARDCODED_DAY1 = [
+  { id:'q1',  text: "What kind of engineer is Al D?",                    a:"Civil",                                    b:"Mechanical",                          c:"Structural",                               d:"Industrial",      correct:"c", order:1  },
+  { id:'q2',  text: "When is Al D's birthday?",                          a:"Dec 18",                                   b:"Dec 21",                              c:"Dec 22",                                   d:"Dec 27",          correct:"c", order:2  },
+  { id:'q3',  text: "Who is older — Al D or Sophia?",                    a:"Al D",                                     b:"Sophia",                              c:"They came out together",                   d:"They aren't really twins", correct:"b", order:3  },
+  { id:'q4',  text: "Where did Al D go to college?",                     a:"Manhattan College – School of Engineering",b:"SUNY",                               c:"New York Institute of Technology",          d:"City Tech",       correct:"d", order:4  },
+  { id:'q5',  text: "What is Al D's middle name?",                       a:"Sam",                                      b:"S",                                   c:"Stephen",                                  d:"M",               correct:"b", order:5  },
+  { id:'q6',  text: "Al D's crush teacher is —",                         a:"Ms. Ullman",                               b:"Ms. Freilich",                        c:"Ms. Djajati",                              d:"Mr. Rabinow",     correct:"b", order:6  },
+  { id:'q7',  text: "What is Sharon's mother's name?",                   a:"Celest",                                   b:"Renni",                               c:"Barbara",                                  d:"Carol",           correct:"b", order:7  },
+  { id:'q8',  text: "Where is Pimalu's cotton produced?",                a:"Dubai",                                    b:"Pima, Arizona",                       c:"Sri Lanka",                                d:"Peru",            correct:"d", order:9  },
+  { id:'q9',  text: "Where did Al D take Sharon on their first date?",   a:"Point Pleasant",                           b:"Reserve Cut",                         c:"Drinks at the 1 Hotel – Brooklyn Bridge",  d:"Noi Due Carne",   correct:"a", order:9  },
+  { id:'q10', text: "What is Al D's favorite meat item?",                a:"Hotdog",                                   b:"Burger",                              c:"Wing",                                     d:"Lachme",          correct:"d", order:10 },
+];
 const CREW = [
   'Leebee "Sheriff"',
   'Matty Ice "Therapist"',
@@ -2675,17 +2687,10 @@ function renderAdminTab(tab) {
     body += '</div>';
     body += '<button class="submit-btn" onclick="resetEverything()" style="background:rgba(192,80,58,0.35);border:1px solid rgba(192,80,58,0.7);color:#ff6b55;margin-top:8px;width:100%;">🚨 Reset Everything</button>';
     body += '</div>';
-    body += '<div id="admin-q-list-0" style="margin-bottom:8px;"></div>';
-    body += '<div style="background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);">';
-    body += '<input class="text-input" id="q0-text" placeholder="Question">';
-    body += '<input class="text-input" id="q0-a" placeholder="Option A">';
-    body += '<input class="text-input" id="q0-b" placeholder="Option B">';
-    body += '<input class="text-input" id="q0-c" placeholder="Option C">';
-    body += '<input class="text-input" id="q0-d" placeholder="Option D">';
-    body += '<select class="text-input" id="q0-correct"><option value="a">✅ Correct Answer: A</option><option value="b">✅ Correct Answer: B</option><option value="c">✅ Correct Answer: C</option><option value="d">✅ Correct Answer: D</option></select>';
-    body += '<input class="text-input" id="q0-order" placeholder="Difficulty order (1=easiest)" type="number" min="1">';
-    body += '<button class="submit-btn" onclick="addTriviaQuestion(0)">Add Question</button>';
-    body += '</div></div>';
+    body += '<div class="admin-section">';
+    body += '<div class="admin-section-title">Day 1 - Trivia Questions</div>';
+    body += '<div style="background:rgba(40,120,60,0.15);border:1px solid rgba(60,180,80,0.3);border-radius:8px;padding:12px;font-size:12px;color:#7de89a;">✅ 10 questions hardcoded — Who Knows Al D? Ready to play.</div>';
+    body += '</div>';
 
     body += '<div class="admin-section">';
     body += '<div class="admin-section-title">Day 2 - Wheel Categories</div>';
