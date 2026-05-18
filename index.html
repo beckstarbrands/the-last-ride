@@ -1290,77 +1290,57 @@ function exportMealBreakdown() {
   const open = meals.filter(m => m.open);
   if (!open.length) { showToast('No open meal orders'); return; }
 
-  // Build a clean summary card as a new window for screenshot
   const lines = [];
   const now = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
   open.forEach(meal => {
     const icon = meal.type === 'breakfast' ? '🍳' : '🥩';
     const orders = meal.orders || {};
-    // Count by option
     const counts = {};
     const names = {};
     Object.entries(orders).forEach(([name, opt]) => {
       counts[opt] = (counts[opt] || 0) + 1;
       if (!names[opt]) names[opt] = [];
-      names[opt].push(name.split(' ')[0]); // first name only
+      names[opt].push(name.split(' ')[0]);
     });
     const totalOrders = Object.keys(orders).length;
     const missing = CREW.filter(n => !orders[n]);
-
     lines.push({ meal, icon, counts, names, totalOrders, missing });
   });
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#120b05; font-family:'Georgia',serif; padding:16px; min-height:100vh; }
-  .header { text-align:center; padding:16px 0 12px; border-bottom:2px solid #c8873a; margin-bottom:16px; }
-  .title { font-size:22px; color:#e8b84b; letter-spacing:2px; }
-  .sub { font-size:11px; color:#8b6914; letter-spacing:1px; margin-top:4px; text-transform:uppercase; }
-  .meal-block { background:#1e1208; border:1px solid #3a2810; border-radius:10px; padding:14px; margin-bottom:14px; }
-  .meal-name { font-size:16px; color:#e8b84b; font-weight:bold; margin-bottom:10px; }
-  .opt-row { display:flex; justify-content:space-between; align-items:flex-start; padding:7px 0; border-bottom:1px solid #2a1a0a; }
-  .opt-row:last-child { border-bottom:none; }
-  .opt-name { font-size:14px; color:#d4a855; font-weight:600; min-width:80px; }
-  .opt-count { font-size:18px; font-weight:900; color:#c8873a; margin:0 10px; white-space:nowrap; }
-  .opt-names { font-size:11px; color:#7a5c28; flex:1; text-align:right; line-height:1.5; }
-  .missing { margin-top:10px; padding:8px; background:#0d0805; border-radius:6px; }
-  .missing-label { font-size:10px; color:#5a3c18; text-transform:uppercase; letter-spacing:1px; }
-  .missing-names { font-size:11px; color:#4a3010; margin-top:3px; }
-  .total-badge { display:inline-block; background:#2a1a0a; border:1px solid #c8873a; border-radius:12px; padding:2px 10px; font-size:11px; color:#c8873a; margin-bottom:8px; }
-  .footer { text-align:center; font-size:10px; color:#3a2810; margin-top:12px; }
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="title">🤠 THE LAST RIDE</div>
-  <div class="sub">Meal Order Breakdown · ${now}</div>
-</div>
-${lines.map(({meal, icon, counts, names, totalOrders, missing}) => `
-<div class="meal-block">
-  <div class="meal-name">${icon} ${meal.label}</div>
-  <div class="total-badge">${totalOrders} / ${CREW.length} ordered</div>
-  ${Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([opt, count]) => `
-  <div class="opt-row">
-    <div class="opt-name">${opt}</div>
-    <div class="opt-count">${count}x</div>
-    <div class="opt-names">${(names[opt]||[]).join(', ')}</div>
-  </div>`).join('')}
-  ${missing.length ? `<div class="missing">
-    <div class="missing-label">⏳ Not ordered yet</div>
-    <div class="missing-names">${missing.map(n => n.split(' ')[0]).join(', ')}</div>
-  </div>` : '<div style="font-size:11px;color:#3a7a3a;margin-top:8px;">✅ Everyone ordered</div>'}
-</div>`).join('')}
-<div class="footer">Screenshot this for your records · The Last Ride Dallas 2026</div>
-</body></html>`;
+  // Build inline overlay instead of popup (iOS Safari blocks popups)
+  let existing = document.getElementById('meal-export-overlay');
+  if (existing) existing.remove();
 
-  const w = window.open('', '_blank', 'width=390,height=700');
-  w.document.write(html);
-  w.document.close();
+  const overlay = document.createElement('div');
+  overlay.id = 'meal-export-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#120b05;z-index:9999;overflow-y:auto;padding:16px;';
+  overlay.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 14px;border-bottom:2px solid #c8873a;margin-bottom:16px;">
+      <div>
+        <div style="font-family:'Rye',cursive;font-size:20px;color:#e8b84b;letter-spacing:2px;">🤠 THE LAST RIDE</div>
+        <div style="font-size:11px;color:#8b6914;letter-spacing:1px;text-transform:uppercase;margin-top:3px;">Meal Breakdown · ${now}</div>
+      </div>
+      <button onclick="document.getElementById('meal-export-overlay').remove()" style="background:#2a1a0a;border:1px solid #c8873a;border-radius:50%;width:36px;height:36px;color:#c8873a;font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>
+    </div>
+    ${lines.map(({meal, icon, counts, names, totalOrders, missing}) => `
+    <div style="background:#1e1208;border:1px solid #3a2810;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="font-size:16px;color:#e8b84b;font-weight:bold;margin-bottom:8px;">${icon} ${meal.label}</div>
+      <div style="display:inline-block;background:#2a1a0a;border:1px solid #c8873a;border-radius:12px;padding:2px 10px;font-size:11px;color:#c8873a;margin-bottom:10px;">${totalOrders} / ${CREW.length} ordered</div>
+      ${Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([opt, count]) => `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #2a1a0a;">
+        <div style="font-size:14px;color:#d4a855;font-weight:600;min-width:80px;">${opt}</div>
+        <div style="font-size:18px;font-weight:900;color:#c8873a;margin:0 10px;">${count}x</div>
+        <div style="font-size:11px;color:#7a5c28;flex:1;text-align:right;line-height:1.5;">${(names[opt]||[]).join(', ')}</div>
+      </div>`).join('')}
+      ${missing.length ? `<div style="margin-top:10px;padding:8px;background:#0d0805;border-radius:6px;">
+        <div style="font-size:10px;color:#5a3c18;text-transform:uppercase;letter-spacing:1px;">⏳ Not ordered yet</div>
+        <div style="font-size:11px;color:#4a3010;margin-top:3px;">${missing.map(n => n.split(' ')[0]).join(', ')}</div>
+      </div>` : '<div style="font-size:11px;color:#3a7a3a;margin-top:8px;">✅ Everyone ordered</div>'}
+    </div>`).join('')}
+    <div style="text-align:center;font-size:10px;color:#3a2810;padding:8px 0 24px;">Screenshot this for your records · The Last Ride Dallas 2026</div>`;
+
+  document.body.appendChild(overlay);
 }
 async function createMeal() {
   const type = document.getElementById('meal-type').value;
