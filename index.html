@@ -235,28 +235,6 @@ body {
 .ann-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
 /* ── QUOTES ──────────────────────────────────── */
-.quote-item {
-  background: var(--leather2);
-  border-radius: 8px; padding: 14px;
-  margin-bottom: 10px;
-  border-left: 3px solid var(--copper);
-  position: relative;
-}
-.quote-item::before {
-  content: '"';
-  position: absolute; top: 6px; left: 10px;
-  font-family: 'Playfair Display', serif;
-  font-size: 48px; color: var(--copper); opacity: 0.2;
-  line-height: 1;
-}
-.quote-text {
-  font-family: 'Playfair Display', serif;
-  font-style: italic; font-size: 15px;
-  line-height: 1.5; color: var(--cream);
-  padding-left: 4px;
-}
-.quote-meta { font-size: 11px; color: var(--muted); margin-top: 6px; }
-
 /* ── INPUTS ──────────────────────────────────── */
 .text-input {
   width: 100%;
@@ -718,11 +696,9 @@ select.text-input {
       <div class="empty-state"><div class="empty-icon">📭</div><p>No announcements yet.<br>Check back soon.</p></div>
     </div>
 
-    <div class="section-title">Quote Board</div>
-    <div id="quotes-list"></div>
-    <div class="card" style="padding:14px;">
-      <input class="text-input" id="quote-input" placeholder="Drop a quote from the trip...">
-      <button class="submit-btn" onclick="submitQuote()">Submit Quote</button>
+    <div class="section-title">Poll of the Day</div>
+    <div class="card card-bronze" id="polls-container">
+      <div class="empty-state"><div class="empty-icon">🗳️</div><p>No active poll right now.<br>Check back later!</p></div>
     </div>
   </div>
 
@@ -734,14 +710,6 @@ select.text-input {
       <div class="day-tab" onclick="switchDay(2)">Thu Jun 4</div>
     </div>
     <div class="card" id="agenda-container"></div>
-  </div>
-
-  <!-- POLLS -->
-  <div class="tab-view" id="tab-polls">
-    <div class="section-title">Poll of the Day</div>
-    <div class="card card-bronze" id="polls-container">
-      <div class="empty-state"><div class="empty-icon">🗳️</div><p>No active poll right now.<br>Check back later!</p></div>
-    </div>
   </div>
 
   <!-- GRUB -->
@@ -783,9 +751,6 @@ select.text-input {
   </div>
   <div class="nav-item" onclick="switchTab('agenda')" id="nav-agenda">
     <div class="nav-icon">📅</div><div class="nav-label">Agenda</div>
-  </div>
-  <div class="nav-item" onclick="switchTab('polls')" id="nav-polls">
-    <div class="nav-icon">🗳️</div><div class="nav-label">Polls</div>
   </div>
   <div class="nav-item" onclick="switchTab('menu')" id="nav-menu">
     <div class="nav-icon">🍳</div><div class="nav-label">Meals</div>
@@ -915,7 +880,6 @@ function onAppReady() {
   updateCountdown();
   setInterval(updateCountdown, 60000);
   loadLocalPhotos();
-  loadLocalQuotes();
   // Load local awards — purge any that don't match exact CREW names
   const rawAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
   const cleanAwards = rawAwards.filter(a => CREW.includes(a.name));
@@ -948,7 +912,6 @@ function loadFromFirebase() {
     renderAnnouncements(window._cachedAnnouncements);
     renderAdminAnnList();
   });
-  onSnapshot(query(collection(db, 'quotes'), orderBy('createdAt', 'desc')), snap => renderQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   onSnapshot(query(collection(db, 'polls'), orderBy('createdAt', 'desc')), snap => {
     window._cachedPolls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderPolls(window._cachedPolls);
@@ -1197,23 +1160,7 @@ async function pushAnnouncement() {
   showToast('Announcement pushed');
 }
 
-// QUOTES
-function renderQuotes(items) {
-  window._cachedQuotes = items;
-  document.getElementById('quotes-list').innerHTML = items.map(q => `
-    <div class="quote-item">
-      <div class="quote-text">${q.text}</div>
-      <div class="quote-meta">— ${q.submittedBy} · ${fmtTime(q.createdAt)}</div>
-    </div>`).join('');
-}
-async function deleteQuote(id) {
-  if (!confirm('Delete this quote?')) return;
-  const stored = JSON.parse(localStorage.getItem('tlr_quotes') || '[]').filter(q => q.id !== id);
-  localStorage.setItem('tlr_quotes', JSON.stringify(stored));
-  renderQuotes(stored);
-  showToast('Quote removed');
-  renderAdminTab('general');
-}
+// PHOTOS
 
 async function deletePhoto(id) {
   if (!confirm('Delete this photo?')) return;
@@ -1224,20 +1171,6 @@ async function deletePhoto(id) {
   renderAdminTab('general');
 }
 
-function renderAdminQuoteList() {
-  const el = document.getElementById('admin-quote-list');
-  if (!el) return;
-  const items = window._cachedQuotes || [];
-  if (!items.length) { el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0 8px;">No quotes yet.</div>'; return; }
-  el.innerHTML = items.map(q => `
-    <div class="admin-q-item">
-      <div class="admin-q-text" style="flex:1;">
-        <div style="font-size:12px;color:var(--text);">"${q.text}"</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">— ${q.submittedBy}</div>
-      </div>
-      <button class="admin-q-del" onclick="deleteQuote('${q.id}')">✕</button>
-    </div>`).join('');
-}
 
 function renderAdminPhotoList() {
   const el = document.getElementById('admin-photo-list');
@@ -1254,23 +1187,8 @@ function renderAdminPhotoList() {
     </div>`).join('') + '</div>';
 }
 
-function loadLocalQuotes() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('tlr_quotes') || '[]');
-    renderQuotes(stored);
-  } catch(e) { renderQuotes([]); }
-}
 
-async function submitQuote() {
-  const text = document.getElementById('quote-input').value.trim();
-  if (!text || !currentUser) { showToast(!currentUser ? 'Pick your name first' : 'Type something!'); return; }
-  const stored = JSON.parse(localStorage.getItem('tlr_quotes') || '[]');
-  stored.unshift({ id: 'q_' + Date.now(), text, submittedBy: currentUser.name, createdAt: Date.now() });
-  localStorage.setItem('tlr_quotes', JSON.stringify(stored));
-  document.getElementById('quote-input').value = '';
-  renderQuotes(stored);
-  showToast('Quote dropped 🤙');
-}
+
 
 // POLLS
 function renderPolls(polls) {
@@ -2619,10 +2537,6 @@ function renderAdminTab(tab) {
     body += '</div>';
 
     body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">💬 Manage Quotes</div>';
-    body += '<div id="admin-quote-list" style="margin-bottom:4px;"></div>';
-    body += '</div>';
-    body += '<div class="admin-section">';
     body += '<div class="admin-section-title">📸 Manage Photos</div>';
     body += '<div id="admin-photo-list"></div>';
     body += '</div>';
@@ -2742,7 +2656,7 @@ function renderAdminTab(tab) {
   panel.innerHTML = nav + body;
 
   // Post-render population
-  if (tab === 'general') { renderAdminAnnList(); renderAdminQuoteList(); renderAdminPhotoList(); }
+  if (tab === 'general') { renderAdminAnnList(); renderAdminPhotoList(); }
   if (tab === 'agenda') { renderAdminAgendaList(); }
   if (tab === 'grub') { renderAdminPolls(window._cachedPolls || []); }
   if (tab === 'game') { renderAdminQList(0); renderAdminQList(1); renderAdminQList(2); renderAdminCategories(); refreshWheelCatSelect(); }
