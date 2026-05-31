@@ -1579,11 +1579,15 @@ async function handlePhotoUpload(event) {
             if (stored.length > 20) stored.pop();
             localStorage.setItem('tlr_photos', JSON.stringify(stored));
             renderPhotos(stored);
-            if (uploadErr.code === 'storage/unauthorized') {
-              showToast('⚠️ Fix Firebase Storage rules — saved locally for now');
-            } else {
-              showToast('📸 Saved locally (Firebase Storage error)');
-            }
+            // Show persistent error banner in the photos feed
+            const feed = document.getElementById('photo-feed');
+            const errCode = uploadErr.code || 'unknown';
+            const banner = document.createElement('div');
+            banner.style.cssText = 'background:rgba(192,80,58,0.2);border:1px solid rgba(192,80,58,0.5);border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#e05a4a;line-height:1.5;';
+            banner.innerHTML = errCode === 'storage/unauthorized'
+              ? '⚠️ <strong>Firebase Storage rules need updating.</strong><br>Photo saved locally on this device only. Fix rules in Firebase Console → Storage → Rules.'
+              : `⚠️ Upload failed (${errCode}). Photo saved locally only.`;
+            if (feed) feed.insertBefore(banner, feed.firstChild);
           }
         } else {
           // localStorage fallback
