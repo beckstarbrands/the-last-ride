@@ -713,10 +713,19 @@ select.text-input {
 
   <!-- GRUB -->
   <div class="tab-view" id="tab-menu">
-    <div class="section-title">Grub Orders</div>
-    <div id="menu-container">
-      <div class="empty-state"><div class="empty-icon">🍽️</div><p>No meals open yet.<br>Admin will post options soon.</p></div>
+    <div style="padding:12px 12px 4px;">
+      <div style="font-family:'Rye',cursive;font-size:20px;letter-spacing:2px;background:var(--grad-bronze);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;">The Spread</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">Dallas · June 2–4, 2026</div>
     </div>
+
+    <!-- Day tabs -->
+    <div style="display:flex;gap:6px;padding:10px 12px 6px;">
+      <button class="menu-day-btn active" id="menu-day-0" onclick="switchMenuDay(0)" style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--bronze);background:var(--grad-bronze);color:var(--bg);">Tue Jun 2</button>
+      <button class="menu-day-btn" id="menu-day-1" onclick="switchMenuDay(1)" style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--leather2);color:var(--muted);">Wed Jun 3</button>
+      <button class="menu-day-btn" id="menu-day-2" onclick="switchMenuDay(2)" style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--leather2);color:var(--muted);">Thu Jun 4</button>
+    </div>
+
+    <div id="menu-day-content" style="padding:4px 12px 24px;"></div>
   </div>
 
   <!-- PHOTOS -->
@@ -737,7 +746,13 @@ select.text-input {
 
   <!-- LEADERBOARD TAB -->
   <div class="tab-view" id="tab-leaderboard">
+    <!-- Toggle -->
+    <div style="display:flex;gap:8px;padding:12px 12px 4px;">
+      <button id="lb-toggle-standings" onclick="showLbTab('standings')" style="flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:0.5px;cursor:pointer;border:1px solid var(--bronze);background:var(--grad-bronze);color:var(--bg);">Standings</button>
+      <button id="lb-toggle-scoring" onclick="showLbTab('scoring')" style="flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:0.5px;cursor:pointer;border:1px solid var(--border);background:var(--leather2);color:var(--muted);">Scoring</button>
+    </div>
     <div id="leaderboard-full"></div>
+    <div id="leaderboard-scoring" style="display:none;padding:8px 12px 24px;"></div>
   </div>
 
 </div>
@@ -784,41 +799,48 @@ select.text-input {
 const ADMIN_PASSWORD = 'Dallas';
 const AGENDA = [
   { day: 'Tuesday, June 2nd', events: [
-    { time: '9:06 – 11:54 AM', activity: 'Flight ✈️' },
-    { time: '12:00 PM', activity: 'Pick up Van', note: '15 passenger' },
-    { time: '1:00 – 3:00 PM', activity: 'Event in Dallas' },
-    { time: '', activity: 'Lunch – Pickup Bennys Bagels 🥯' },
-    { time: '4:00 PM', activity: 'Arrive at House 🏠' },
-    { time: '5:00 – 7:00 PM', activity: 'Pickle Tourney & Pool 🏓' },
-    { time: '7:00 PM', activity: 'Dinner – BBQ (no steaks) 🍖' },
-    { time: 'During Dinner', activity: 'Speech 🎤' },
-    { time: '8:00 PM', activity: 'Special Announcement – The Chatan, Al D 👑' },
-    { time: '8:30 PM', activity: 'Micha/Arbit – Al D Chazan' },
-    { time: '8:45 PM', activity: 'Sunset 🌅' },
-    { time: '9:00 PM', activity: 'Pickle Finals Under the Lights 🔦', note: 'Barn' },
-    { time: '10:00 – 11:30 PM', activity: 'Game Night by Matt 🎲' },
+    { time: '9:06 – 11:54 AM',   activity: 'Flight ✈️',                              note: 'Newark' },
+    { time: '12:00 PM',           activity: 'Pick Up Van',                             note: '15 passenger van' },
+    { time: '1:00 PM',            activity: 'Dairy Lunch 🥛',                          note: 'Midtown Pizza' },
+    { time: '1:10 PM',            activity: 'Alc Pickup',                              note: 'Spec Liquor Inwood' },
+    { time: '2:00 – 3:00 PM',    activity: 'Netflix House 🎬',                         note: 'Galleria Dallas, 13550 Dallas Pkwy' },
+    { time: '3:45 PM',            activity: 'Walmart Pickup 🛒',                        note: '150 N Interstate' },
+    { time: '4:30 PM',            activity: 'Arrive at House 🏠',                       note: '9212 NW Country Rd 1343 Blooming Grove' },
+    { time: '5:00 – 7:00 PM',    activity: 'Pickle Tourney & Pool 🏓' },
+    { time: '7:00 PM',            activity: 'Dinner – BBQ 🔥',                          note: 'Outside Patio' },
+    { time: 'During Dinner',      activity: 'Chandelier 🕯️',                            note: 'Kami' },
+    { time: 'During Dinner',      activity: 'Some People Have Things to Say 🎤',        note: 'Kami, Sayegh, DS' },
+    { time: '8:00 PM',            activity: 'Special Announcement from The Chatan 👑' },
+    { time: '8:20 PM',            activity: 'Micha/Arbit – Al D Chazan 🎶',             note: 'House/Barn' },
+    { time: '8:31 PM',            activity: 'Sunset 🌅' },
+    { time: '8:45 PM',            activity: 'Shower Time 🚿',                           note: 'House/Barn' },
+    { time: '9:30 – 10:30 PM',   activity: 'Drinks & Music with DJ Sprinkle 🎵',        note: 'Barn' },
+    { time: '10:30 PM – 12:00 AM', activity: 'Jeopardeezy 🎲' },
   ]},
   { day: 'Wednesday, June 3rd', events: [
-    { time: '8:30 – 9:15 AM', activity: 'Shacharit 🙏' },
-    { time: '9:30 – 11:00 AM', activity: 'Breakfast by ID 🍳' },
-    { time: '11:00 AM – 6:00 PM', activity: 'Videographer 🎥' },
-    { time: '11:00 AM – 12:00 PM', activity: 'Individual Interviews – Round 1', note: 'Main House' },
-    { time: '12:00 – 12:30 PM', activity: 'Jersey/Pin Presentation & Warmups 👕' },
-    { time: '12:30 – 2:00 PM', activity: 'Kickball Game ⚽' },
-    { time: '2:00 – 3:30 PM', activity: 'Lunch – Pizzas, Chill by Pool 🍕' },
-    { time: '3:30 – 4:00 PM', activity: 'Signature Moments / Snippets ✨' },
-    { time: '4:00 – 4:30 PM', activity: 'Relay Race Marathon 🏃' },
-    { time: '4:30 – 6:00 PM', activity: 'Individual Interviews – Round 2', note: 'Main House' },
-    { time: '7:00 PM', activity: 'Dinner – BBQ Steak Night 🥩' },
-    { time: '7:30 PM', activity: 'NBA Finals by Pool – Kahal Wager 🏀' },
-    { time: 'Halftime', activity: 'Al D Slideshow 📽️' },
-    { time: '8:32 PM', activity: 'Sunset 🌅' },
+    { time: '8:30 – 9:15 AM',    activity: 'Shacharit 🙏' },
+    { time: '9:30 – 10:45 AM',   activity: 'Breakfast by ID 🍳' },
+    { time: '10:00 – 10:30 AM',  activity: 'CrossFit x Edo Basha 💪' },
+    { time: '12:00 PM – 5:00 PM', activity: 'Special Event ✨' },
+    { time: '12:00 – 12:30 PM',  activity: 'Pre-Game Ceremony 🏅' },
+    { time: '12:45 – 2:00 PM',   activity: 'Main Event Kickball ⚽',                   note: 'Kickball Field 1' },
+    { time: '2:00 – 3:00 PM',    activity: 'Lunch, Pool, Signature Moments 🍕',        note: 'Pool Side' },
+    { time: '3:00 – 4:00 PM',    activity: 'Individual Interviews – Round 2',          note: 'In main house' },
+    { time: '4:00 – 4:30 PM',    activity: 'Marathon Relay Race 🏃' },
+    { time: '5:00 PM',            activity: 'Game & Mincha',                            note: 'Sensei' },
+    { time: '5:30 – 7:00 PM',    activity: "Do Ya'll Thing",                           note: 'Anywhere' },
+    { time: '7:30 PM',            activity: 'NBA Finals & Dinner 🏀🥩',                 note: 'Pool Side' },
+    { time: 'Halftime',           activity: 'Surprise with Leebee 🎁',                  note: 'Pool Side' },
+    { time: '8:31 PM',            activity: 'Sunset 🌅' },
+    { time: '10:00 PM',           activity: 'Some More People Have Things to Say 🎤',   note: 'Edniss & Al Sitt' },
+    { time: '10:25 PM',           activity: 'Game Night 🎲',                            note: 'ID' },
   ]},
   { day: 'Thursday, June 4th', events: [
-    { time: 'Morning', activity: 'Minyan 🙏' },
-    { time: '', activity: 'Breakfast by ID 🍳' },
-    { time: '', activity: 'Head to Airport 🧳' },
-    { time: '10:32 AM', activity: 'Flight Home ✈️' },
+    { time: 'Own Time',           activity: 'Minyan 🙏' },
+    { time: '6:00 AM',            activity: 'Wake Up ⏰' },
+    { time: '6:30 AM',            activity: 'Breakfast/Lunch by ID 🍳' },
+    { time: '7:00 AM',            activity: 'Head to Airport 🧳' },
+    { time: '10:32 AM – 3:07 PM', activity: 'Flight Home ✈️',                          note: 'DFW' },
   ]}
 ];
 
@@ -880,6 +902,7 @@ function onAppReady() {
   updateCountdown();
   setInterval(updateCountdown, 60000);
   loadLocalPhotos();
+  renderMenuDay(0);
   // Load local awards — purge any that don't match exact CREW names
   const rawAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
   const cleanAwards = rawAwards.filter(a => CREW.includes(a.name));
@@ -1227,7 +1250,89 @@ function renderAdminPhotoList() {
 
 
 
-// POLLS
+// ── HARDCODED MENU ───────────────────────────
+const DAILY_MENU = [
+  {
+    day: 'Tuesday June 2nd',
+    meals: [
+      { type: 'Breakfast', icon: '🥯', name: 'Bagels from Deal', items: [] },
+      { type: 'Lunch',     icon: '🍕', name: 'Midtown Pizza',    items: [] },
+      { type: 'Dinner',    icon: '🔥', name: 'BBQ',              items: [
+        'Burgers', 'Dogs', 'Wings', 'Chicken Cutlets',
+        'Short Rib Pastrami', 'Asian Marinated Baby Chicken',
+        'Chilli Lime Marinated Baby Chicken'
+      ]},
+    ]
+  },
+  {
+    day: 'Wednesday June 3rd',
+    meals: [
+      { type: 'Breakfast', icon: '🍳', name: 'Eggs + Grilled Cheese', items: [] },
+      { type: 'Lunch',     icon: '🍕', name: 'Brick Oven Pizzas', items: [
+        'Classic', 'Vodka', 'Margarita', 'Pepe Signature',
+        'Korean Flatbread', 'Pastrami Flatbread', 'BBQ Flatbread'
+      ]},
+      { type: 'Dinner',    icon: '🥩', name: 'BBQ', items: [
+        'Black Angus Ribeye', 'Chateau de Bouef Filet',
+        'Pepper Crusted Chateau de Bouef', 'Oyster Steak',
+        'Chimichuri Oyster Steak', 'Corn Ribs'
+      ]},
+    ]
+  },
+  {
+    day: 'Thursday June 4th',
+    meals: [
+      { type: 'Breakfast', icon: '🍳', name: 'Eggs',                       items: [] },
+      { type: 'Lunch',     icon: '🥙', name: 'Eggs/Cream Cheese Pitas to go', items: [] },
+    ]
+  }
+];
+
+let currentMenuDay = 0;
+
+function switchMenuDay(idx) {
+  currentMenuDay = idx;
+  [0,1,2].forEach(i => {
+    const btn = document.getElementById('menu-day-' + i);
+    if (!btn) return;
+    if (i === idx) {
+      btn.style.background = 'var(--grad-bronze)';
+      btn.style.color = 'var(--bg)';
+      btn.style.borderColor = 'var(--bronze)';
+    } else {
+      btn.style.background = 'var(--leather2)';
+      btn.style.color = 'var(--muted)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  });
+  renderMenuDay(idx);
+}
+
+function renderMenuDay(idx) {
+  const el = document.getElementById('menu-day-content');
+  if (!el) return;
+  const day = DAILY_MENU[idx];
+  el.innerHTML = day.meals.map(meal => `
+    <div style="background:var(--leather2);border-radius:12px;border:1px solid var(--border);margin-bottom:12px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:${meal.items.length ? '1px solid var(--border)' : 'none'};">
+        <div style="font-size:24px;">${meal.icon}</div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">${meal.type}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:1px;">${meal.name}</div>
+        </div>
+      </div>
+      ${meal.items.length ? `
+      <div style="padding:10px 14px 12px;">
+        ${meal.items.map(item => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <div style="width:5px;height:5px;border-radius:50%;background:var(--bronze);flex-shrink:0;"></div>
+          <div style="font-size:13px;color:var(--text2);">${item}</div>
+        </div>`).join('')}
+      </div>` : ''}
+    </div>`).join('');
+}
+
+// ── MEALS (Firebase ordering — now unused but kept for compatibility) ─
 function renderPolls(polls) {
   const el = document.getElementById('polls-container');
   const active = polls.find(p => p.active);
@@ -1459,24 +1564,39 @@ async function handlePhotoUpload(event) {
         const blob = await (await fetch(dataUrl)).blob();
 
         if (window._firebaseReady) {
-          const { ref, uploadBytes, getDownloadURL, collection, addDoc, serverTimestamp } = window._firebase;
-          const storageRef = ref(window._storage, 'photos/' + Date.now() + '_' + currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '.jpg');
-          const snap = await uploadBytes(storageRef, blob);
-          const url = await getDownloadURL(snap.ref);
-          await addDoc(collection(window._db, 'photos'), { url, uploadedBy: currentUser.name, createdAt: serverTimestamp() });
-          showToast('📸 Photo added to the feed!');
+          try {
+            const { ref, uploadBytes, getDownloadURL, collection, addDoc, serverTimestamp } = window._firebase;
+            const storageRef = ref(window._storage, 'photos/' + Date.now() + '_' + currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '.jpg');
+            const snap = await uploadBytes(storageRef, blob);
+            const url = await getDownloadURL(snap.ref);
+            await addDoc(collection(window._db, 'photos'), { url, uploadedBy: currentUser.name, createdAt: serverTimestamp() });
+            showToast('📸 Photo added to the feed!');
+          } catch(uploadErr) {
+            console.error('Storage error:', uploadErr.code, uploadErr.message);
+            // Fallback to localStorage
+            const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
+            stored.unshift({ id: 'photo_'+Date.now(), url: dataUrl, uploadedBy: currentUser.name, createdAt: Date.now() });
+            if (stored.length > 20) stored.pop();
+            localStorage.setItem('tlr_photos', JSON.stringify(stored));
+            renderPhotos(stored);
+            if (uploadErr.code === 'storage/unauthorized') {
+              showToast('⚠️ Fix Firebase Storage rules — saved locally for now');
+            } else {
+              showToast('📸 Saved locally (Firebase Storage error)');
+            }
+          }
         } else {
           // localStorage fallback
           const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
           stored.unshift({ id: 'photo_'+Date.now(), url: dataUrl, uploadedBy: currentUser.name, createdAt: Date.now() });
-          if (stored.length > 30) stored.pop();
+          if (stored.length > 20) stored.pop();
           localStorage.setItem('tlr_photos', JSON.stringify(stored));
           renderPhotos(stored);
           showToast('📸 Photo saved!');
         }
       };
       img.src = e.target.result;
-    } catch(err) { showToast('Upload failed — try a smaller photo'); }
+    } catch(err) { console.error('Photo error:', err); showToast('Upload failed — try a smaller photo'); }
   };
   reader.readAsDataURL(file);
   event.target.value = '';
@@ -2312,6 +2432,85 @@ function deleteAward(id) {
 }
 
 // ── LEADERBOARD (game + bonus combined) ──────
+function showLbTab(tab) {
+  const standings = document.getElementById('leaderboard-full');
+  const scoring = document.getElementById('leaderboard-scoring');
+  const btnS = document.getElementById('lb-toggle-standings');
+  const btnSc = document.getElementById('lb-toggle-scoring');
+  if (!standings || !scoring) return;
+
+  if (tab === 'standings') {
+    standings.style.display = 'block';
+    scoring.style.display = 'none';
+    btnS.style.background = 'var(--grad-bronze)'; btnS.style.color = 'var(--bg)'; btnS.style.borderColor = 'var(--bronze)';
+    btnSc.style.background = 'var(--leather2)'; btnSc.style.color = 'var(--muted)'; btnSc.style.borderColor = 'var(--border)';
+  } else {
+    standings.style.display = 'none';
+    scoring.style.display = 'block';
+    btnSc.style.background = 'var(--grad-bronze)'; btnSc.style.color = 'var(--bg)'; btnSc.style.borderColor = 'var(--bronze)';
+    btnS.style.background = 'var(--leather2)'; btnS.style.color = 'var(--muted)'; btnS.style.borderColor = 'var(--border)';
+    renderScoringTab();
+  }
+}
+
+function renderScoringTab() {
+  const el = document.getElementById('leaderboard-scoring');
+  if (!el || el.innerHTML.length > 100) return; // already rendered
+
+  const section = (emoji, title, rows) => `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="font-size:20px;">${emoji}</div>
+        <div style="font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);">${title}</div>
+      </div>
+      <div style="background:var(--leather2);border-radius:10px;border:1px solid var(--border);overflow:hidden;">
+        ${rows.map((r, i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;${i < rows.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+          <div style="font-size:14px;color:var(--text);">${r.label}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--bronze);text-align:right;white-space:nowrap;">${r.value}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="text-align:center;padding:16px 0 14px;">
+      <div style="font-family:'Rye',cursive;font-size:20px;letter-spacing:2px;background:var(--grad-bronze);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Point Breakdown</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:3px;">Know what you're playing for</div>
+    </div>
+
+    ${section('🏆', 'App Games', [
+      { label: 'Daily Trivia', value: 'Winner: 1,000 pts' },
+    ])}
+
+    ${section('⚽', 'Sporting Events', [
+      { label: 'Pickleball', value: '1st: 1,500 · 2nd: 750' },
+      { label: 'Kickball', value: '1st: 1,500 pts' },
+      { label: 'Relay Race', value: '1st: 1,500 pts' },
+    ])}
+
+    ${section('🎮', 'House Games', [
+      { label: '1st place only', value: '1,500 pts each' },
+    ])}
+
+    ${section('🌍', 'Outside Games', [
+      { label: '1st place only', value: '1,500 pts each' },
+    ])}
+
+    ${section('🎲', 'Pop-Up Moments', [
+      { label: 'Random challenges', value: '300–1,000 pts' },
+      { label: 'Line of the Day', value: '300 pts' },
+    ])}
+
+    ${section('⭐', "Al D's Call", [
+      { label: 'Chef, Speech, Chazan & more', value: '50–500 pts' },
+    ])}
+
+    <div style="background:rgba(232,184,75,0.06);border:1px solid rgba(232,184,75,0.2);border-radius:10px;padding:12px 14px;margin-top:4px;">
+      <div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">⚡ How scoring works</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">Al D awards points live throughout the trip. App trivia runs automatically. Everything adds up on the Standings tab.</div>
+    </div>`;
+}
+
 function renderLeaderboard(scores) {
   // Always cache the latest game scores passed in
   if (scores && scores.length) window._lastGameScores = scores;
@@ -2705,18 +2904,8 @@ function renderAdminTab(tab) {
     body += '<input class="text-input" id="poll-opt4" placeholder="Option 4 (optional)">';
     body += '<button class="submit-btn" onclick="createPoll()">Launch Poll</button>';
     body += '</div>';
-    body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">Active Meal Orders</div>';
-    body += '<div id="admin-meal-list" style="margin-bottom:8px;"></div>';
-    body += '<button class="submit-btn" onclick="exportMealBreakdown()" style="background:rgba(200,135,58,0.2);border:1px solid var(--bronze);color:var(--bronze);margin-bottom:4px;">📋 Export Order Breakdown</button>';
-    body += '</div>';
-    body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">Open New Meal Order</div>';
-    body += '<select class="text-input" id="meal-type"><option value="breakfast">Breakfast</option><option value="dinner">Dinner</option></select>';
-    body += '<input class="text-input" id="meal-label" placeholder="Label (e.g. Wed Breakfast)">';
-    body += '<input class="text-input" id="meal-opts" placeholder="Options, comma-separated">';
-    body += '<button class="submit-btn" onclick="createMeal()">Open Orders</button>';
-    body += '</div>';
+
+
 
   } else if (tab === 'game') {
     body += '<div class="admin-section">';
