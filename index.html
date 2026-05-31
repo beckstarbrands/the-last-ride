@@ -669,9 +669,8 @@ select.text-input {
     <div class="header-sub">Al-D's BP · Dallas, TX</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <div id="header-user" style="font-size:12px;color:var(--text2);text-align:right;display:none;cursor:pointer;" onclick="showLogoutMenu()">
+    <div id="header-user" style="font-size:12px;color:var(--text2);text-align:right;display:none;">
       <div id="header-user-name" style="font-weight:600;color:var(--gold);"></div>
-      <div style="font-size:10px;color:var(--text2);opacity:0.6;">tap to switch</div>
     </div>
     <button class="admin-btn" onclick="openAdmin()">Admin</button>
   </div>
@@ -722,14 +721,13 @@ select.text-input {
 
   <!-- PHOTOS -->
   <div class="tab-view" id="tab-photos">
-    <div class="section-title">The Memories</div>
-    <div class="upload-area" onclick="document.getElementById('photo-upload').click()">
-      <div class="upload-icon">📷</div>
-      <div class="upload-text">Tap to drop a photo from the trip</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;">
+      <div class="section-title" style="margin:0;">The Memories</div>
+      <button onclick="document.getElementById('photo-upload').click()" style="background:var(--grad-bronze);border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--bg);cursor:pointer;">📷 Add</button>
     </div>
     <input type="file" id="photo-upload" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
-    <div class="photo-grid" id="photo-grid"></div>
-    <div class="empty-state" id="photos-empty"><div class="empty-icon">🖼️</div><p>No photos yet — be the first!</p></div>
+    <div id="photo-feed"></div>
+    <div class="empty-state" id="photos-empty"><div class="empty-icon">🖼️</div><p>No photos yet.<br>Be the first to drop one!</p></div>
   </div>
 
   <!-- GAME -->
@@ -827,7 +825,9 @@ const AGENDA = [
 let currentUser = null;
 let currentDay = 0;
 let userVotes = {};
-let dayVisibility = [true, true, true]; // controlled by admin toggles
+let dayVisibility = (() => {
+  try { const s = localStorage.getItem('tlr_dayvis'); return s ? JSON.parse(s) : [true,true,true]; } catch { return [true,true,true]; }
+})(); // controlled by admin toggles, persists across sessions
 
 // ONBOARDING
 function init() {
@@ -964,6 +964,12 @@ function getAgendaDay(idx) {
 }
 
 function renderAgenda(idx) {
+  const agendaContainer = document.getElementById('agenda-container');
+  const allHidden = dayVisibility.every(v => !v);
+  if (allHidden) {
+    agendaContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🤠</div><p>Agenda dropping soon.<br>Stay tuned, OGs.</p></div>';
+    return;
+  }
   const d = getAgendaDay(idx);
   let html = `<div class="agenda-day-label">${d.day}</div>`;
   (d.events || []).forEach(ev => {
@@ -975,7 +981,7 @@ function renderAgenda(idx) {
       </div>
     </div>`;
   });
-  document.getElementById('agenda-container').innerHTML = html;
+  agendaContainer.innerHTML = html;
 }
 
 function loadAgendaFromFirebase() {
@@ -1104,16 +1110,28 @@ async function addAgendaEvent() {
     await pushDayToFirebase(adminAgendaDay, null, existingEvents);
   }
 
+  // Convert time string to sortable number (e.g. "9:30AM" → 930, "2:00PM" → 1400)
+  function timeToOrder(t) {
+    if (!t) return 9999;
+    const m = t.match(/(\d+):(\d+)\s*(AM|PM|am|pm)?/);
+    if (!m) return 9999;
+    let h = parseInt(m[1]), min = parseInt(m[2]);
+    const period = (m[3] || '').toUpperCase();
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return h * 100 + min;
+  }
+
   const { collection, addDoc } = window._firebase;
   await addDoc(collection(window._db, `agenda_day${adminAgendaDay}`), {
     time, activity, note,
-    order: existingEvents.length
+    order: timeToOrder(time)
   });
 
   document.getElementById('agenda-new-time').value = '';
   document.getElementById('agenda-new-activity').value = '';
   document.getElementById('agenda-new-note').value = '';
-  showToast('Event added');
+  showToast('Event added ✓');
 }
 
 // Push the baked-in agenda day to Firebase (one-time migration)
@@ -1134,12 +1152,22 @@ async function pushDayToFirebase(dayIdx, mapFn, overrideEvents) {
     await deleteDoc(doc(db, `agenda_day${dayIdx}`, d.id));
   }
 
-  // Write fresh events
+  // Write fresh events with time-based order
   const sourceEvents = overrideEvents || AGENDA[dayIdx].events;
   const events = mapFn ? sourceEvents.map(mapFn) : sourceEvents;
+  function timeToOrder(t) {
+    if (!t) return 9999;
+    const m = t.match(/(\d+):(\d+)\s*(AM|PM|am|pm)?/);
+    if (!m) return 9999;
+    let h = parseInt(m[1]), min = parseInt(m[2]);
+    const period = (m[3] || '').toUpperCase();
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return h * 100 + min;
+  }
   for (let i = 0; i < events.length; i++) {
     const ev = events[i];
-    await addDoc(colRef, { time: ev.time || '', activity: ev.activity || '', note: ev.note || '', order: i });
+    await addDoc(colRef, { time: ev.time || '', activity: ev.activity || '', note: ev.note || '', order: timeToOrder(ev.time) });
   }
 }
 
@@ -1168,9 +1196,14 @@ async function pushAnnouncement() {
 
 async function deletePhoto(id) {
   if (!confirm('Delete this photo?')) return;
-  const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]').filter(p => p.id !== id);
-  localStorage.setItem('tlr_photos', JSON.stringify(stored));
-  renderPhotos(stored);
+  if (window._firebaseReady) {
+    const { doc, deleteDoc } = window._firebase;
+    await deleteDoc(doc(window._db, 'photos', id));
+  } else {
+    const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]').filter(p => p.id !== id);
+    localStorage.setItem('tlr_photos', JSON.stringify(stored));
+    renderPhotos(stored);
+  }
   showToast('Photo removed');
   renderAdminTab('general');
 }
@@ -1375,19 +1408,29 @@ function renderAdminMealList() {
 // PHOTOS
 function renderPhotos(photos) {
   window._cachedPhotos = photos;
-  const grid = document.getElementById('photo-grid');
+  const feed = document.getElementById('photo-feed');
   const empty = document.getElementById('photos-empty');
-  if (!photos.length) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-  grid.innerHTML = photos.map(p => `
-    <div class="photo-card">
-      <img src="${p.url}" alt="" loading="lazy">
-      ${p.uploadedBy ? `<div class="photo-caption">${p.uploadedBy}</div>` : ''}
+  if (!feed) return;
+  if (!photos || !photos.length) {
+    feed.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  feed.innerHTML = photos.map(p => `
+    <div style="margin-bottom:16px;">
+      <img src="${p.url}" alt="" loading="lazy" style="width:100%;display:block;border-radius:10px 10px 0 0;max-height:400px;object-fit:cover;">
+      <div style="background:#1e1208;border-radius:0 0 10px 10px;padding:10px 14px;border:1px solid var(--border);border-top:none;display:flex;align-items:center;gap:8px;">
+        <div style="font-size:18px;">${CREW_EMOJI[p.uploadedBy] || '📸'}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">${p.uploadedBy || 'Crew'}</div>
+          <div style="font-size:10px;color:var(--muted);">${p.createdAt ? new Date(p.createdAt.toDate ? p.createdAt.toDate() : p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        </div>
+      </div>
     </div>`).join('');
 }
 
 function loadLocalPhotos() {
-  // Show locally cached photos while Firebase loads
   try {
     const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
     if (stored.length) renderPhotos(stored);
@@ -1397,14 +1440,14 @@ function loadLocalPhotos() {
 async function handlePhotoUpload(event) {
   const file = event.target.files[0];
   if (!file || !currentUser) { showToast('Not ready yet'); return; }
-  showToast('Uploading...');
+  showToast('Uploading... 📸');
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
       const img = new Image();
       img.onload = async function() {
         const canvas = document.createElement('canvas');
-        const maxDim = 1200;
+        const maxDim = 800; // compressed for storage
         let w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
           if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
@@ -1412,22 +1455,24 @@ async function handlePhotoUpload(event) {
         }
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         const blob = await (await fetch(dataUrl)).blob();
+
         if (window._firebaseReady) {
           const { ref, uploadBytes, getDownloadURL, collection, addDoc, serverTimestamp } = window._firebase;
           const storageRef = ref(window._storage, 'photos/' + Date.now() + '_' + currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '.jpg');
           const snap = await uploadBytes(storageRef, blob);
           const url = await getDownloadURL(snap.ref);
           await addDoc(collection(window._db, 'photos'), { url, uploadedBy: currentUser.name, createdAt: serverTimestamp() });
-          showToast('📸 Photo uploaded!');
+          showToast('📸 Photo added to the feed!');
         } else {
+          // localStorage fallback
           const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
           stored.unshift({ id: 'photo_'+Date.now(), url: dataUrl, uploadedBy: currentUser.name, createdAt: Date.now() });
           if (stored.length > 30) stored.pop();
           localStorage.setItem('tlr_photos', JSON.stringify(stored));
           renderPhotos(stored);
-          showToast('📸 Saved locally (no sync)');
+          showToast('📸 Photo saved!');
         }
       };
       img.src = e.target.result;
@@ -2776,6 +2821,7 @@ function toggleDay(idx) {
   const el = document.getElementById('toggle-day' + idx);
   if (el) el.classList.toggle('on');
   dayVisibility[idx] = !dayVisibility[idx];
+  localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
   renderDayTabs();
   // If currently viewing a now-hidden day, jump to first visible
   if (!dayVisibility[currentDay]) {
@@ -2789,10 +2835,18 @@ function renderDayTabs() {
   const container = document.querySelector('.day-tabs');
   if (!container) return;
   const labels = ['Tue Jun 2', 'Wed Jun 3', 'Thu Jun 4'];
-  container.innerHTML = dayVisibility.map((vis, i) => {
+  const visibleTabs = dayVisibility.map((vis, i) => {
     if (!vis) return '';
     return '<div class="day-tab' + (i === currentDay ? ' active' : '') + '" onclick="switchDay(' + i + ')">' + labels[i] + '</div>';
   }).join('');
+  container.innerHTML = visibleTabs;
+
+  // Show/hide the agenda coming soon message
+  const agendaContainer = document.getElementById('agenda-container');
+  const allHidden = dayVisibility.every(v => !v);
+  if (allHidden && agendaContainer) {
+    agendaContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🤠</div><p>Agenda dropping soon.<br>Stay tuned, OGs.</p></div>';
+  }
 }
 
 // HELPERS
