@@ -978,6 +978,23 @@ function switchTab(tab) {
 let liveAgenda = null;
 let adminAgendaDay = 0;
 
+// ── NUKE old Firebase agenda so hardcoded one always wins ────────────
+async function clearFirebaseAgenda() {
+  if (!window._firebaseReady) return;
+  const { collection, getDocs, deleteDoc, doc } = window._firebase;
+  for (let i = 0; i < 3; i++) {
+    const snap = await getDocs(collection(window._db, `agenda_day${i}`));
+    if (!snap.empty) {
+      await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, `agenda_day${i}`, d.id))));
+      console.log(`Cleared agenda_day${i} (${snap.docs.length} docs)`);
+    }
+  }
+  liveAgenda = null;
+  renderDayTabs();
+  renderAgenda(currentDay);
+  showToast('Agenda reset to hardcoded ✓');
+}
+
 function switchDay(idx) {
   currentDay = idx;
   document.querySelectorAll('.day-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
@@ -2871,6 +2888,7 @@ function renderAdminTab(tab) {
     body += '</div></div>';
     body += '<div class="admin-section">';
     body += '<div class="admin-section-title">Agenda Day Visibility</div>';
+    body += '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Hide days from crew until ready to reveal.</div>';
     body += '<div class="toggle-row">Tuesday Jun 2<div class="toggle ' + (dayVisibility[0]?'on':'') + '" id="toggle-day0" onclick="toggleDay(0)"></div></div>';
     body += '<div class="toggle-row">Wednesday Jun 3<div class="toggle ' + (dayVisibility[1]?'on':'') + '" id="toggle-day1" onclick="toggleDay(1)"></div></div>';
     body += '<div class="toggle-row">Thursday Jun 4<div class="toggle ' + (dayVisibility[2]?'on':'') + '" id="toggle-day2" onclick="toggleDay(2)"></div></div>';
@@ -2884,6 +2902,8 @@ function renderAdminTab(tab) {
   } else if (tab === 'agenda') {
     body += '<div class="admin-section">';
     body += '<div class="admin-section-title">Edit Agenda</div>';
+    body += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">If agenda looks wrong, reset it to clear any old Firebase data.</div>';
+    body += '<button class="submit-btn" onclick="clearFirebaseAgenda()" style="background:rgba(192,80,58,0.2);border:1px solid rgba(192,80,58,0.5);color:#e05a4a;margin-bottom:12px;">🔄 Reset Agenda to Hardcoded</button>';
     body += '<div class="admin-day-tabs">';
     body += '<div class="admin-day-tab active" onclick="switchAdminDay(0)">Tue Jun 2</div>';
     body += '<div class="admin-day-tab" onclick="switchAdminDay(1)">Wed Jun 3</div>';
