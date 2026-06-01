@@ -825,9 +825,7 @@ const AGENDA = [
 let currentUser = null;
 let currentDay = 0;
 let userVotes = {};
-let dayVisibility = (() => {
-  try { const s = localStorage.getItem('tlr_dayvis'); return s ? JSON.parse(s) : [true,true,true]; } catch { return [true,true,true]; }
-})(); // controlled by admin toggles, persists across sessions
+let dayVisibility = [true, true, true]; // always default visible; Firebase is source of truth
 
 // ONBOARDING
 function init() {
@@ -1498,7 +1496,7 @@ function renderAdminMealList() {
 
 // ─── GAME ENGINE ──────────────────────────────
 // Day determination: before June 2 = Day 1; auto by date on trip; admin can override
-let gameDayOverride = null;
+let gameDayOverride = null; // always default auto; Firebase is source of truth
 let gameVisible = (() => { try { return localStorage.getItem('tlr_game_vis') !== 'false'; } catch { return true; } })();
 let menuVisible = (() => { try { return localStorage.getItem('tlr_menu_vis') !== 'false'; } catch { return true; } })();
 let pollVisible = (() => { try { return localStorage.getItem('tlr_poll_vis') !== 'false'; } catch { return true; } })(); // null = auto
@@ -2674,23 +2672,24 @@ function syncVisibilityToFirebase() {
 
 function applyVisibilitySettings(data) {
   if (!data) return;
-  if (Array.isArray(data.dayVisibility)) {
-    dayVisibility = data.dayVisibility;
-    localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
-    // If currentDay is now hidden, move to first visible day
-    if (!dayVisibility[currentDay]) {
-      const first = dayVisibility.findIndex(v => v);
-      if (first >= 0) currentDay = first;
-    }
-    renderDayTabs();
-    renderAgenda(currentDay);
+  // dayVisibility: use stored value, or default all visible
+  const newDayVis = Array.isArray(data.dayVisibility) ? data.dayVisibility : [true, true, true];
+  dayVisibility = newDayVis;
+  localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
+  // If currentDay is now hidden, move to first visible day
+  if (!dayVisibility[currentDay]) {
+    const first = dayVisibility.findIndex(v => v);
+    if (first >= 0) currentDay = first;
   }
-  if (data.gameDay !== undefined) {
-    const newGameDay = data.gameDay === 'auto' ? null : data.gameDay;
-    if (newGameDay !== gameDayOverride) {
-      gameDayOverride = newGameDay;
-      renderGameTab();
-    }
+  renderDayTabs();
+  renderAgenda(currentDay);
+  // gameDay: use stored value, or default to auto if not set
+  const newGameDay = data.gameDay !== undefined
+    ? (data.gameDay === 'auto' ? null : data.gameDay)
+    : null;  // default to auto
+  if (newGameDay !== gameDayOverride) {
+    gameDayOverride = newGameDay;
+    renderGameTab();
   }
   if (data.gameVisible !== undefined) {
     gameVisible = data.gameVisible;
