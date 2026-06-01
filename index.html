@@ -972,9 +972,21 @@ function switchTab(tab) {
   if (tab === 'leaderboard') {
     window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
     renderLeaderboard(window._lastGameScores || []);
-    // Refresh activity if it's visible
     const actEl = document.getElementById('leaderboard-activity');
     if (actEl && actEl.style.display !== 'none') renderActivityTab();
+    // Auto-refresh every 10 seconds while on this tab
+    if (window._lbRefreshInterval) clearInterval(window._lbRefreshInterval);
+    window._lbRefreshInterval = setInterval(() => {
+      const lbTab = document.getElementById('tab-leaderboard');
+      if (lbTab && lbTab.classList.contains('active')) {
+        window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
+        renderLeaderboard(window._lastGameScores || []);
+      } else {
+        clearInterval(window._lbRefreshInterval);
+      }
+    }, 10000);
+  } else {
+    if (window._lbRefreshInterval) clearInterval(window._lbRefreshInterval);
   }
 }
 
@@ -2372,7 +2384,13 @@ async function giveAward() {
 
   if (window._firebaseReady) {
     const { collection, addDoc, serverTimestamp } = window._firebase;
-    await addDoc(collection(window._db, 'bonus_awards'), { name, reason, pts, type:'bonus', ts: serverTimestamp() }).catch(()=>{});
+    try {
+      const ref = await addDoc(collection(window._db, 'bonus_awards'), { name, reason, pts, type:'bonus', ts: serverTimestamp() });
+      // Update local entry with Firebase id so it dedupes properly
+      const stored = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
+      const idx = stored.findIndex(a => a.id === award.id);
+      if (idx >= 0) { stored[idx].firebaseId = ref.id; localStorage.setItem('tlr_awards', JSON.stringify(stored)); }
+    } catch(e) { console.error('Award sync error:', e); }
   }
 }
 
@@ -2877,12 +2895,20 @@ function loadGameData() {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderLeaderboard(window._lastGameScores);
   });
-  // Bonus awards — cache and re-render leaderboard
-  onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts','asc')), snap => {
-    window._cachedAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Re-render leaderboard with updated bonus data
-    const scoresEl = document.getElementById('game-leaderboard');
-    if (scoresEl) renderLeaderboard(window._lastGameScores || []);
+  // Bonus awards — sync across devices via Firestore
+  onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
+    const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Merge with any local-only awards, Firebase wins on conflicts
+    const localAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
+    const firebaseIds = new Set(firebaseAwards.map(a => a.id));
+    const localOnly = localAwards.filter(a => !firebaseIds.has(a.id));
+    const merged = [...firebaseAwards, ...localOnly].sort((a,b) => (a.ts||0) - (b.ts||0));
+    window._cachedAwards = merged;
+    localStorage.setItem('tlr_awards', JSON.stringify(merged));
+    renderLeaderboard(window._lastGameScores || []);
+    // Refresh activity tab if open
+    const actEl = document.getElementById('leaderboard-activity');
+    if (actEl && actEl.style.display !== 'none') renderActivityTab();
   });
 }
 
