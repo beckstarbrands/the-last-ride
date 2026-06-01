@@ -908,14 +908,8 @@ function onAppReady() {
   setInterval(updateCountdown, 60000);
   loadLocalPhotos();
   renderMenuDay(0);
-  // Load local awards — purge any that don't match exact CREW names
-  const rawAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
-  const cleanAwards = rawAwards.filter(a => CREW.includes(a.name));
-  if (cleanAwards.length !== rawAwards.length) {
-    localStorage.setItem('tlr_awards', JSON.stringify(cleanAwards));
-  }
-  window._cachedAwards = cleanAwards;
-  renderLeaderboard(window._lastGameScores || []);
+  // Awards come from Firebase onSnapshot listener — just init empty here
+  window._cachedAwards = [];
   loadFromFirebase();
   if (currentUser) {
     const el = document.getElementById('header-user');
@@ -2482,6 +2476,10 @@ function deleteAward(id) {
   const stored = JSON.parse(localStorage.getItem('tlr_awards') || '[]').filter(a => a.id !== id);
   localStorage.setItem('tlr_awards', JSON.stringify(stored));
   window._cachedAwards = stored;
+  if (window._firebaseReady) {
+    const { doc, deleteDoc } = window._firebase;
+    deleteDoc(doc(window._db, 'bonus_awards', id)).catch(e => console.error('Delete award error:', e));
+  }
   renderLeaderboard(window._lastGameScores || []);
   loadAwardHistory();
   showToast('Award removed');
@@ -2568,7 +2566,8 @@ function renderActivityTab() {
       const emoji = CREW_EMOJI[e.name] || '';
       const pts = e.pts > 0 ? '+' + e.pts : e.pts;
       const color = typeColor[e.type] || 'var(--muted)';
-      const date = e.ts ? new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      const tsVal = e.ts?.seconds ? e.ts.seconds * 1000 : (typeof e.ts === 'number' && e.ts > 1000000000000 ? e.ts : null);
+      const date = tsVal ? new Date(tsVal).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
       return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="font-size:18px;flex-shrink:0;">${typeIcon[e.type]||'⭐'}</div>
         <div style="flex:1;min-width:0;">
@@ -2895,18 +2894,13 @@ function loadGameData() {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderLeaderboard(window._lastGameScores);
   });
-  // Bonus awards — sync across devices via Firestore
+  // Bonus awards — Firebase is the single source of truth
   onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
     const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Merge with any local-only awards, Firebase wins on conflicts
-    const localAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
-    const firebaseIds = new Set(firebaseAwards.map(a => a.id));
-    const localOnly = localAwards.filter(a => !firebaseIds.has(a.id));
-    const merged = [...firebaseAwards, ...localOnly].sort((a,b) => (a.ts||0) - (b.ts||0));
-    window._cachedAwards = merged;
-    localStorage.setItem('tlr_awards', JSON.stringify(merged));
+    window._cachedAwards = firebaseAwards;
+    // Sync to localStorage as cache only
+    localStorage.setItem('tlr_awards', JSON.stringify(firebaseAwards));
     renderLeaderboard(window._lastGameScores || []);
-    // Refresh activity tab if open
     const actEl = document.getElementById('leaderboard-activity');
     if (actEl && actEl.style.display !== 'none') renderActivityTab();
   });
