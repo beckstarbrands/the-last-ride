@@ -334,24 +334,8 @@ select.text-input {
 }
 
 /* ── PHOTOS ──────────────────────────────────── */
-.upload-area {
-  border: 2px dashed var(--border2); border-radius: 10px;
-  padding: 28px 20px; text-align: center; cursor: pointer;
-  transition: all 0.2s; margin-bottom: 14px;
-  background: var(--leather);
-}
 .upload-area:active { border-color: var(--gold); background: rgba(200,135,58,0.1); }
-.upload-icon { font-size: 32px; margin-bottom: 8px; }
-.upload-text { font-size: 13px; color: var(--muted); }
-.photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-.photo-card { border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--leather); position: relative; border: 1px solid var(--border); }
 .photo-card img { width: 100%; height: 100%; object-fit: cover; }
-.photo-caption {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: linear-gradient(transparent, rgba(12,6,2,0.9));
-  padding: 16px 8px 8px; font-size: 11px; color: var(--text2);
-}
-
 /* ── GAME ────────────────────────────────────── */
 .game-header {
   background: linear-gradient(160deg, var(--leather2), var(--bg2));
@@ -731,17 +715,6 @@ select.text-input {
     <div id="menu-day-content" style="padding:4px 12px 24px;"></div>
   </div>
 
-  <!-- PHOTOS -->
-  <div class="tab-view" id="tab-photos">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;">
-      <div class="section-title" style="margin:0;">The Memories</div>
-      <button onclick="document.getElementById('photo-upload').click()" style="background:var(--grad-bronze);border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--bg);cursor:pointer;">📷 Add</button>
-    </div>
-    <input type="file" id="photo-upload" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
-    <div id="photo-feed"></div>
-    <div class="empty-state" id="photos-empty"><div class="empty-icon">🖼️</div><p>No photos yet.<br>Be the first to drop one!</p></div>
-  </div>
-
   <!-- GAME -->
   <div class="tab-view" id="tab-game">
     <div id="game-container"></div>
@@ -772,9 +745,6 @@ select.text-input {
   </div>
   <div class="nav-item" onclick="switchTab('menu')" id="nav-menu">
     <div class="nav-icon">🍳</div><div class="nav-label">EKEL</div>
-  </div>
-  <div class="nav-item" onclick="switchTab('photos')" id="nav-photos">
-    <div class="nav-icon">📸</div><div class="nav-label">Photos</div>
   </div>
   <div class="nav-item" onclick="switchTab('game')" id="nav-game">
     <div class="nav-icon">🃏</div><div class="nav-label">Game</div>
@@ -906,7 +876,6 @@ function onAppReady() {
   renderGameTab();
   updateCountdown();
   setInterval(updateCountdown, 60000);
-  loadLocalPhotos();
   renderMenuDay(0);
   // Awards come from Firebase onSnapshot listener — just init empty here
   window._cachedAwards = [];
@@ -943,10 +912,6 @@ function loadFromFirebase() {
     window._cachedMeals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderMenu(window._cachedMeals);
     renderAdminMealList();
-  });
-  onSnapshot(query(collection(db, 'photos'), orderBy('createdAt', 'desc')), snap => {
-    const photos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderPhotos(photos);
   });
   onSnapshot(query(collection(db, 'game_scores'), orderBy('score', 'desc')), snap => {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1248,36 +1213,6 @@ async function pushAnnouncement() {
 
 // PHOTOS
 
-async function deletePhoto(id) {
-  if (!confirm('Delete this photo?')) return;
-  if (window._firebaseReady) {
-    const { doc, deleteDoc } = window._firebase;
-    await deleteDoc(doc(window._db, 'photos', id));
-  } else {
-    const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]').filter(p => p.id !== id);
-    localStorage.setItem('tlr_photos', JSON.stringify(stored));
-    renderPhotos(stored);
-  }
-  showToast('Photo removed');
-  renderAdminTab('general');
-}
-
-
-function renderAdminPhotoList() {
-  const el = document.getElementById('admin-photo-list');
-  if (!el) return;
-  const items = window._cachedPhotos || [];
-  if (!items.length) { el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0 8px;">No photos yet.</div>'; return; }
-  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">` + items.map(p => `
-    <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid var(--border);">
-      <img src="${p.url}" style="width:100%;height:100%;object-fit:cover;">
-      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);padding:4px 6px;display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%;">${p.uploadedBy||''}</div>
-        <button onclick="deletePhoto('${p.id}')" style="background:rgba(192,80,58,0.8);border:none;border-radius:4px;color:white;font-size:11px;padding:2px 6px;cursor:pointer;">✕</button>
-      </div>
-    </div>`).join('') + '</div>';
-}
-
 
 
 
@@ -1543,100 +1478,7 @@ function renderAdminMealList() {
 }
 
 // PHOTOS
-function renderPhotos(photos) {
-  window._cachedPhotos = photos;
-  const feed = document.getElementById('photo-feed');
-  const empty = document.getElementById('photos-empty');
-  if (!feed) return;
-  if (!photos || !photos.length) {
-    feed.innerHTML = '';
-    if (empty) empty.style.display = 'block';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-  feed.innerHTML = photos.map(p => `
-    <div style="margin-bottom:16px;">
-      <img src="${p.url}" alt="" loading="lazy" style="width:100%;display:block;border-radius:10px 10px 0 0;max-height:400px;object-fit:cover;">
-      <div style="background:#1e1208;border-radius:0 0 10px 10px;padding:10px 14px;border:1px solid var(--border);border-top:none;display:flex;align-items:center;gap:8px;">
-        <div style="font-size:18px;">${CREW_EMOJI[p.uploadedBy] || '📸'}</div>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);">${p.uploadedBy || 'Crew'}</div>
-          <div style="font-size:10px;color:var(--muted);">${p.createdAt ? new Date(p.createdAt.toDate ? p.createdAt.toDate() : p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}</div>
-        </div>
-      </div>
-    </div>`).join('');
-}
 
-function loadLocalPhotos() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
-    if (stored.length) renderPhotos(stored);
-  } catch(e) {}
-}
-
-async function handlePhotoUpload(event) {
-  const file = event.target.files[0];
-  if (!file || !currentUser) { showToast('Not ready yet'); return; }
-  showToast('Uploading... 📸');
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    try {
-      const img = new Image();
-      img.onload = async function() {
-        const canvas = document.createElement('canvas');
-        const maxDim = 800; // compressed for storage
-        let w = img.width, h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-          else { w = Math.round(w * maxDim / h); h = maxDim; }
-        }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const blob = await (await fetch(dataUrl)).blob();
-
-        if (window._firebaseReady) {
-          try {
-            const { ref, uploadBytes, getDownloadURL, collection, addDoc, serverTimestamp } = window._firebase;
-            const storageRef = ref(window._storage, 'photos/' + Date.now() + '_' + currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '.jpg');
-            const snap = await uploadBytes(storageRef, blob);
-            const url = await getDownloadURL(snap.ref);
-            await addDoc(collection(window._db, 'photos'), { url, uploadedBy: currentUser.name, createdAt: serverTimestamp() });
-            showToast('📸 Photo added to the feed!');
-          } catch(uploadErr) {
-            console.error('Storage error:', uploadErr.code, uploadErr.message);
-            // Fallback to localStorage
-            const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
-            stored.unshift({ id: 'photo_'+Date.now(), url: dataUrl, uploadedBy: currentUser.name, createdAt: Date.now() });
-            if (stored.length > 20) stored.pop();
-            localStorage.setItem('tlr_photos', JSON.stringify(stored));
-            renderPhotos(stored);
-            // Show persistent error banner in the photos feed
-            const feed = document.getElementById('photo-feed');
-            const errCode = uploadErr.code || 'unknown';
-            const banner = document.createElement('div');
-            banner.style.cssText = 'background:rgba(192,80,58,0.2);border:1px solid rgba(192,80,58,0.5);border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#e05a4a;line-height:1.5;';
-            banner.innerHTML = errCode === 'storage/unauthorized'
-              ? '⚠️ <strong>Firebase Storage rules need updating.</strong><br>Photo saved locally on this device only. Fix rules in Firebase Console → Storage → Rules.'
-              : `⚠️ Upload failed (${errCode}). Photo saved locally only.`;
-            if (feed) feed.insertBefore(banner, feed.firstChild);
-          }
-        } else {
-          // localStorage fallback
-          const stored = JSON.parse(localStorage.getItem('tlr_photos') || '[]');
-          stored.unshift({ id: 'photo_'+Date.now(), url: dataUrl, uploadedBy: currentUser.name, createdAt: Date.now() });
-          if (stored.length > 20) stored.pop();
-          localStorage.setItem('tlr_photos', JSON.stringify(stored));
-          renderPhotos(stored);
-          showToast('📸 Photo saved!');
-        }
-      };
-      img.src = e.target.result;
-    } catch(err) { console.error('Photo error:', err); showToast('Upload failed — try a smaller photo'); }
-  };
-  reader.readAsDataURL(file);
-  event.target.value = '';
-}
 
 // ─── GAME ENGINE ──────────────────────────────
 // Day determination: before June 2 = Day 1; auto by date on trip; admin can override
@@ -3070,10 +2912,7 @@ function renderAdminTab(tab) {
     body += '<div class="toggle-row">Thursday Jun 4<div class="toggle ' + (dayVisibility[2]?'on':'') + '" id="toggle-day2" onclick="toggleDay(2)"></div></div>';
     body += '</div>';
 
-    body += '<div class="admin-section">';
-    body += '<div class="admin-section-title">📸 Manage Photos</div>';
-    body += '<div id="admin-photo-list"></div>';
-    body += '</div>';
+
 
   } else if (tab === 'agenda') {
     body += '<div class="admin-section">';
@@ -3192,7 +3031,7 @@ function renderAdminTab(tab) {
   panel.innerHTML = nav + body;
 
   // Post-render population
-  if (tab === 'general') { renderAdminAnnList(); renderAdminPhotoList(); }
+  if (tab === 'general') { renderAdminAnnList(); }
   if (tab === 'agenda') { renderAdminAgendaList(); }
   if (tab === 'grub') { renderAdminPolls(window._cachedPolls || []); renderAdminMealList(); }
   if (tab === 'game') { renderAdminQList(2); renderAdminCategories(); refreshWheelCatSelect(); renderWhoPlayed(); }
