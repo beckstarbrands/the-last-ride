@@ -774,22 +774,25 @@ select.text-input {
 const ADMIN_PASSWORD = 'Dallas';
 const AGENDA = [
   { day: 'Tuesday, June 2nd', events: [
-    { time: '9:06 – 11:54 AM',   activity: 'Flight ✈️',                              note: 'Newark' },
-    { time: '12:00 PM',           activity: 'Pick Up Van',                             note: '15 passenger van' },
-    { time: '1:00 PM',            activity: 'Dairy Lunch 🥛',                          note: 'Midtown Pizza' },
-    { time: '1:10 PM',            activity: 'Alc Pickup',                              note: 'Spec Liquor Inwood' },
-    { time: '2:00 – 3:00 PM',    activity: 'Netflix House 🎬',                         note: 'Galleria Dallas, 13550 Dallas Pkwy' },
-    { time: '3:45 PM',            activity: 'Walmart Pickup 🛒',                        note: '150 N Interstate' },
-    { time: '4:30 PM',            activity: 'Arrive at House 🏠',                       note: '9212 NW Country Rd 1343 Blooming Grove' },
-    { time: '5:00 – 7:00 PM',    activity: 'Pickle Tourney & Pool 🏓' },
-    { time: '7:00 PM',            activity: 'Dinner – BBQ 🔥',                          note: 'Outside Patio' },
-    { time: 'During Dinner',      activity: 'Chandelier 🕯️',                            note: 'Kami' },
-    { time: 'During Dinner',      activity: 'Some People Have Things to Say 🎤',        note: 'Kami, Sayegh, DS' },
-    { time: '8:00 PM',            activity: 'Special Announcement from The Chatan 👑' },
-    { time: '8:20 PM',            activity: 'Micha/Arbit – Al D Chazan 🎶',             note: 'House/Barn' },
-    { time: '8:31 PM',            activity: 'Sunset 🌅' },
-    { time: '8:45 PM',            activity: 'Shower Time 🚿',                           note: 'House/Barn' },
-    { time: '9:30 – 10:30 PM',   activity: 'Drinks & Music with DJ Sprinkle 🎵',        note: 'Barn' },
+    { time: '6:15 AM',             activity: 'Pickup – Edniss House',                   note: 'Leon, Eddie, Al Sitt, ID' },
+    { time: '6:15 AM',             activity: 'Pickup – Al D House',                     note: 'Al D, Sabbagh, Ally, Setton, Sayegh' },
+    { time: '8:00 AM',             activity: 'Minyan at Airport Gate 🙏' },
+    { time: '9:06 – 11:54 AM',    activity: 'Flight ✈️',                              note: 'Newark' },
+    { time: '12:00 PM',            activity: 'Pick Up Van',                             note: '15 passenger van' },
+    { time: '1:00 PM',             activity: 'Dairy Lunch 🥛',                          note: 'Midtown Pizza' },
+    { time: '1:10 PM',             activity: 'Alc Pickup',                              note: 'Spec Liquor Inwood' },
+    { time: '2:00 – 3:00 PM',     activity: 'Squidy 🎬',                               note: 'Galleria Dallas, 13550 Dallas Pkwy' },
+    { time: '3:45 PM',             activity: 'Walmart Pickup 🛒',                        note: '150 N Interstate' },
+    { time: '4:30 PM',             activity: 'Arrive at House 🏠',                       note: '9212 NW Country Rd 1343 Blooming Grove' },
+    { time: '5:00 – 7:00 PM',     activity: 'Pickle Tourney & Pool 🏓' },
+    { time: '5:30 – 6:00 PM',     activity: 'Chandelier',                               note: 'Kami' },
+    { time: '7:00 PM',             activity: 'Dinner – BBQ 🔥',                          note: 'Outside Patio' },
+    { time: 'During Dinner',       activity: 'Some People Have Things to Say 🎤',        note: 'Kami, Sayegh, DS' },
+    { time: '8:00 PM',             activity: 'Special Announcement from The Chatan 👑' },
+    { time: '8:20 PM',             activity: 'Micha/Arbit – Al D Chazan 🎶',             note: 'House/Barn' },
+    { time: '8:31 PM',             activity: 'Sunset 🌅' },
+    { time: '8:45 PM',             activity: 'Shower Time 🚿',                           note: 'House/Barn' },
+    { time: '9:30 – 10:30 PM',    activity: 'Drinks & Music with DJ Sprinkle 🎵',        note: 'Barn' },
     { time: '10:30 PM – 12:00 AM', activity: 'Jeopardeezy 🎲' },
   ]},
   { day: 'Wednesday, June 3rd', events: [
@@ -800,7 +803,7 @@ const AGENDA = [
     { time: '12:00 – 12:30 PM',  activity: 'Pre-Game Ceremony 🏅' },
     { time: '12:45 – 2:00 PM',   activity: 'Main Event Kickball ⚽',                   note: 'Kickball Field 1' },
     { time: '2:00 – 3:00 PM',    activity: 'Lunch, Pool, Signature Moments 🍕',        note: 'Pool Side' },
-    { time: '3:00 – 4:00 PM',    activity: 'Individual Interviews – Round 2',          note: 'In main house' },
+    { time: '3:00 – 4:00 PM',    activity: 'How You Feeling – Round 2',              note: 'In main house' },
     { time: '4:00 – 4:30 PM',    activity: 'Marathon Relay Race 🏃' },
     { time: '5:00 PM',            activity: 'Game & Mincha',                            note: 'Sensei' },
     { time: '5:30 – 7:00 PM',    activity: "Do Ya'll Thing",                           note: 'Anywhere' },
@@ -1137,7 +1140,8 @@ async function addAgendaEvent() {
     let h = parseInt(m[1]), min = parseInt(m[2]);
     const period = (m[3] || '').toUpperCase();
     if (period === 'PM' && h !== 12) h += 12;
-    if (period === 'AM' && h === 12) h = 0;
+    else if (period === 'AM' && h === 12) h = 0;
+    else if (!period && h >= 1 && h <= 11) h += 12;
     return h * 100 + min;
   }
 
@@ -1181,7 +1185,8 @@ async function pushDayToFirebase(dayIdx, mapFn, overrideEvents) {
     let h = parseInt(m[1]), min = parseInt(m[2]);
     const period = (m[3] || '').toUpperCase();
     if (period === 'PM' && h !== 12) h += 12;
-    if (period === 'AM' && h === 12) h = 0;
+    else if (period === 'AM' && h === 12) h = 0;
+    else if (!period && h >= 1 && h <= 11) h += 12;
     return h * 100 + min;
   }
   for (let i = 0; i < events.length; i++) {
