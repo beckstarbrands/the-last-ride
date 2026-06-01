@@ -1821,7 +1821,7 @@ function startDay2Game() {
     </div>
     <div id="wheel-question-area"></div>
     <button class="submit-btn" onclick="finishDay2()" style="margin-top:8px;">Finish & See Score</button>`;
-  drawWheel(cats, -Math.PI / 2);
+  drawWheel(HARDCODED_DAY2_CATEGORIES, -Math.PI / 2);
 }
 
 function drawWheel(cats, startAngle) {
@@ -1914,6 +1914,7 @@ function showWheelQuestion(cat) {
   const q = unused[Math.floor(Math.random() * unused.length)];
   triviaState.wheelUsed.push(q.id);
   triviaState.answered = false;
+  triviaState.wheelResult = q; // Store the QUESTION not the category
   const choices = [q.a, q.b, q.c, q.d].filter(Boolean);
   area.innerHTML = `
     <div style="text-align:center;margin-bottom:10px;font-size:22px;">${cat.emoji||'★'} <span style="font-family:'Rye',cursive;font-size:16px;color:var(--bronze)">${cat.name}</span></div>
