@@ -806,6 +806,7 @@ const AGENDA = [
     { time: '1:30 – 2:30 PM',     activity: 'Lunch, Pool, Signature Moments 🍕',        note: 'Pool Side' },
     { time: '3:30 – 4:00 PM',     activity: 'Marathon Relay Race 🏃' },
     { time: '4:00 – 5:00 PM',     activity: 'How You Feeling – Round 2',               note: 'In main house' },
+    { time: '5:00 PM',             activity: 'Mincha & Game with Sensei 🙏🎮' },
     { time: '5:30 – 7:00 PM',    activity: "Do Ya'll Thing",                           note: 'Anywhere' },
     { time: '7:30 PM',            activity: 'NBA Finals & Dinner 🏀🥩',                 note: 'Pool Side' },
     { time: 'Halftime',           activity: 'Surprise with Leebee 🎁',                  note: 'Pool Side' },
@@ -926,6 +927,14 @@ function loadFromFirebase() {
   });
   loadAgendaFromFirebase();
   loadGameData();
+
+  // Real-time listener for visibility settings (agenda days, game day, gameVisible, etc.)
+  const { doc, onSnapshot: onSnap } = window._firebase;
+  onSnap(doc(db, 'app_settings', 'visibility'), snap => {
+    if (snap.exists()) {
+      applyVisibilitySettings(snap.data());
+    }
+  });
 }
 
 // TABS
