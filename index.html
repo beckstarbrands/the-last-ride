@@ -1822,7 +1822,7 @@ function startDay2Game() {
     </div>
     <button class="submit-btn" id="spin-btn" onclick="spinWheel()" style="margin-bottom:8px;">Spin It!</button>
     <div id="wheel-question-area"></div>
-    <button class="submit-btn" onclick="finishDay2()" style="background:rgba(200,135,58,0.15);border:1px solid var(--bronze);color:var(--bronze);margin-top:4px;">Finish & See Score</button>`;
+    <button class="submit-btn" id="finish-day2-btn" onclick="finishDay2()" style="background:rgba(200,135,58,0.15);border:1px solid var(--bronze);color:var(--bronze);margin-top:4px;display:none;">Finish & See Score</button>`;
 
   // Use setTimeout to ensure canvas is in DOM before drawing
   setTimeout(() => drawWheel(HARDCODED_DAY2_CATEGORIES, -Math.PI / 2), 50);
@@ -1872,41 +1872,37 @@ function drawWheel(cats, startAngle) {
 }
 
 function spinWheel() {
-  const cats = HARDCODED_DAY2_CATEGORIES;
+  var cats = HARDCODED_DAY2_CATEGORIES;
   if (!cats.length) return;
-  const btn = document.getElementById('spin-btn');
+  var btn = document.getElementById('spin-btn');
   if (btn) btn.disabled = true;
   triviaState.answered = false;
 
-  const spins = 5 + Math.floor(Math.random() * 5);
-  const winIdx = Math.floor(Math.random() * cats.length);
-  const slice = (2 * Math.PI) / cats.length;
+  var spins = 5 + Math.floor(Math.random() * 5);
+  var winIdx = Math.floor(Math.random() * cats.length);
+  var slice = (2 * Math.PI) / cats.length;
 
-  // Pointer is at the top (−π/2 in canvas coords).
-  // Slice i spans from (startAngle + i*slice) to (startAngle + (i+1)*slice).
-  // We want the CENTER of winIdx's slice to be under the pointer at the end.
-  // Final startAngle = −π/2 − (winIdx * slice + slice/2)
-  // We add full rotations on top, always rotating forward (positive direction).
-  const finalStart = -Math.PI / 2 - (winIdx * slice + slice / 2);
-  // Normalize so the delta from the initial −π/2 is always positive
-  let delta = finalStart - (-Math.PI / 2);
-  // Make delta negative (wheel spins clockwise visually = increasing angle)
-  // We want to go forward: add enough full rotations so delta > 0
+  // drawWheel places slice i with center at: startAngle + i*slice + slice/2
+  // Pointer is at top = -PI/2. We need center of winIdx slice to land at -PI/2.
+  //   startAngle + winIdx*slice + slice/2 = -PI/2  (mod 2PI)
+  //   finalStartAngle = -PI/2 - winIdx*slice - slice/2
+  // Wheel spins forward (angle increases). Compute positive delta from -PI/2.
+  var initialStart = -Math.PI / 2;
+  var finalStart = -Math.PI / 2 - winIdx * slice - slice / 2;
+  var delta = finalStart - initialStart;
   delta = ((delta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  const totalAngle = spins * 2 * Math.PI + delta;
+  var totalAngle = spins * 2 * Math.PI + delta;
 
-  const duration = 3500;
-  const start = performance.now();
+  var duration = 3500;
+  var start = performance.now();
 
   function animate(now) {
-    const elapsed = now - start;
-    const t = Math.min(elapsed / duration, 1);
-    const ease = 1 - Math.pow(1 - t, 4);
-    const currentAngle = -Math.PI / 2 + ease * totalAngle;
-    drawWheel(cats, currentAngle);
+    var elapsed = now - start;
+    var t = Math.min(elapsed / duration, 1);
+    var ease = 1 - Math.pow(1 - t, 4);
+    drawWheel(cats, initialStart + ease * totalAngle);
     if (t < 1) { requestAnimationFrame(animate); return; }
-    // Spin complete — show the winning category
-    const spinsEl = document.getElementById('g-spins2');
+    var spinsEl = document.getElementById('g-spins2');
     if (spinsEl) spinsEl.textContent = (parseInt(spinsEl.textContent) || 0) + 1;
     showWheelQuestion(cats[winIdx]);
   }
@@ -1955,6 +1951,11 @@ function answerWheelQ(idx) {
   if (fb) { fb.style.display = 'block'; fb.className = `trivia-feedback ${correct ? 'correct-fb' : 'wrong-fb'}`; fb.textContent = correct ? '✓ Correct!' : `✗ The answer was: ${correctText}`; }
   if (correct) { triviaState.correct++; const el = document.getElementById('g-correct2'); if (el) el.textContent = triviaState.correct; }
   setTimeout(() => { const btn = document.getElementById('spin-btn'); if (btn) btn.disabled = false; }, 2000);
+  // Show finish button once all 9 questions have been answered
+  if (triviaState.wheelUsed.length >= HARDCODED_DAY2_QUESTIONS.length) {
+    const fb = document.getElementById('finish-day2-btn');
+    if (fb) { fb.style.display = 'block'; fb.textContent = 'All Done! See Your Score 🏆'; }
+  }
 }
 
 async function finishDay2() {
