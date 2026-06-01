@@ -18,7 +18,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, getDoc, onSnapshot, query, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
   import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
   // ============================================
@@ -800,12 +800,12 @@ const AGENDA = [
     { time: '9:30 – 10:45 AM',   activity: 'Breakfast by ID 🍳' },
     { time: '10:00 – 10:30 AM',  activity: 'CrossFit x Edo Basha 💪' },
     { time: '12:00 PM – 5:00 PM', activity: 'Special Event ✨' },
-    { time: '12:00 – 12:30 PM',  activity: 'Pre-Game Ceremony 🏅' },
-    { time: '12:45 – 2:00 PM',   activity: 'Main Event Kickball ⚽',                   note: 'Kickball Field 1' },
-    { time: '2:00 – 3:00 PM',    activity: 'Lunch, Pool, Signature Moments 🍕',        note: 'Pool Side' },
-    { time: '3:00 – 4:00 PM',    activity: 'How You Feeling – Round 2',              note: 'In main house' },
-    { time: '4:00 – 4:30 PM',    activity: 'Marathon Relay Race 🏃' },
-    { time: '5:00 PM',            activity: 'Game & Mincha',                            note: 'Sensei' },
+    { time: '11:00 AM – 12:00 PM', activity: 'Pre-Game Ceremony 🏅' },
+    { time: '12:00 – 1:00 PM',    activity: 'Tell Us About Yourself' },
+    { time: '1:00 – 2:30 PM',     activity: 'Main Event Kickball ⚽',                   note: 'Kickball Field 1' },
+    { time: '1:30 – 2:30 PM',     activity: 'Lunch, Pool, Signature Moments 🍕',        note: 'Pool Side' },
+    { time: '3:30 – 4:00 PM',     activity: 'Marathon Relay Race 🏃' },
+    { time: '4:00 – 5:00 PM',     activity: 'How You Feeling – Round 2',               note: 'In main house' },
     { time: '5:30 – 7:00 PM',    activity: "Do Ya'll Thing",                           note: 'Anywhere' },
     { time: '7:30 PM',            activity: 'NBA Finals & Dinner 🏀🥩',                 note: 'Pool Side' },
     { time: 'Halftime',           activity: 'Surprise with Leebee 🎁',                  note: 'Pool Side' },
@@ -833,9 +833,15 @@ let dayVisibility = (() => {
 function init() {
   const saved = localStorage.getItem('tlr_user');
   if (saved) {
-    currentUser = JSON.parse(saved);
-    document.getElementById('onboarding').classList.remove('open');
-    onAppReady();
+    const parsed = JSON.parse(saved);
+    // Only accept if it's a valid CREW name — clear stale/test users
+    if (parsed && CREW.includes(parsed.name)) {
+      currentUser = parsed;
+      document.getElementById('onboarding').classList.remove('open');
+      onAppReady();
+    } else {
+      localStorage.removeItem('tlr_user');
+    }
   }
   // Populate crew dropdown
   const sel = document.getElementById('onboard-name');
@@ -1736,7 +1742,7 @@ async function showTriviaResults() {
 
 // ── DAY 2: SPIN THE WHEEL ────────────────────
 async function renderDay2(container) {
-  const cats = wheelCategories;
+  const cats = HARDCODED_DAY2_CATEGORIES;
   if (!cats.length) {
     container.innerHTML = `
       <div class="game-header">
@@ -1860,7 +1866,7 @@ function drawWheel(cats, startAngle) {
 }
 
 function spinWheel() {
-  const cats = wheelCategories;
+  const cats = HARDCODED_DAY2_CATEGORIES;
   if (!cats.length) return;
   const btn = document.getElementById('spin-btn');
   if (btn) btn.disabled = true;
@@ -1897,7 +1903,7 @@ function spinWheel() {
 function showWheelQuestion(cat) {
   const area = document.getElementById('wheel-question-area');
   if (!area) return;
-  const catQs = (triviaQuestions[1] || []).filter(q => q.category === cat.name);
+  const catQs = HARDCODED_DAY2_QUESTIONS.filter(q => q.category === cat.name);
   const unused = catQs.filter(q => !triviaState.wheelUsed.includes(q.id));
   if (!unused.length) {
     area.innerHTML = `<div class="card" style="text-align:center;padding:20px;"><div style="font-size:24px;margin-bottom:8px;">${cat.emoji||'★'}</div><div style="color:var(--muted);font-size:14px;">No more questions in<br><strong style="color:var(--bronze)">${cat.name}</strong>.<br>Spin again!</div></div>`;
@@ -2181,9 +2187,33 @@ async function hasPlayedToday() {
 }
 
 // ── HARDCODED GAME QUESTIONS ─────────────────
+const HARDCODED_DAY2_CATEGORIES = [
+  { id:'cat1', name:'Breaking Records',    emoji:'🎵' },
+  { id:'cat2', name:'Noted',               emoji:'📝' },
+  { id:'cat3', name:'Sharon Knows Best',   emoji:'💕' },
+  { id:'cat4', name:'Pass the Roast',      emoji:'🔥' },
+  { id:'cat5', name:'Deal, Old Jersey',    emoji:'🏈' },
+  { id:'cat6', name:'Old Dog No New Tricks', emoji:'📱' },
+  { id:'cat7', name:'Big Bats',            emoji:'🥎' },
+  { id:'cat8', name:'Transition Time',     emoji:'👓' },
+  { id:'cat9', name:'Dress Code',          emoji:'👔' },
+];
+
+const HARDCODED_DAY2_QUESTIONS = [
+  { id:'d2q1', category:'Breaking Records',     text:"Meno used to have a record store – what was the name of the store?",                                                                                    a:"Stephens Records Ltd.", b:"Music By Meno",          c:"Zaks Music",                      d:"Newbury Records",       correct:"c" },
+  { id:'d2q2', category:'Noted',                text:"Ald loves his notes app. How many notes does he have on his phone (verified number)?",                                                                  a:"2233",                  b:"1546",                   c:"1372",                            d:"947",                   correct:"c" },
+  { id:'d2q3', category:'Sharon Knows Best',    text:"We asked Sharon what is one thing that you really love about Ald that he doesn't even know.",                                                          a:"His attentiveness",     b:"Appreciates his family relationship", c:"Loves cuddling in his hairy armpits", d:"His game day pin collection", correct:"a" },
+  { id:'d2q4', category:'Pass the Roast',       text:"Al Deezy has some funny items only he does. What is one thing in particular that he can't do if his life depended on it?",                             a:"Simply make a K Turn",  b:"Read Lips",              c:"Pray at Mishkan",                 d:"All of the Above",      correct:"d" },
+  { id:'d2q5', category:'Deal, Old Jersey',     text:"This Purim Ald dressed up with this sports jersey.",                                                                                                   a:"Peyton Manning Colts",  b:"Todd Gurley Rams",       c:"Tyrod Taylor Bills",              d:"Kevin Durant Nets",     correct:"b" },
+  { id:'d2q6', category:'Old Dog No New Tricks',text:"Ald famously doesn't update anything he owns. Current iOS is 26.5 – what version is on Ald's phone right now?",                                       a:"26.5",                  b:"26.4.2",                 c:"18.7.8",                          d:"16.1.4",                correct:"b" },
+  { id:'d2q7', category:'Big Bats',             text:"Ald was what number on MDY HS Softball team?",                                                                                                         a:"22",                    b:"5",                      c:"18",                              d:"20",                    correct:"d" },
+  { id:'d2q8', category:'Transition Time',      text:"No not that type of transition. Ald famously wears his transition glasses. Where is Al D's home base office?",                                        a:"J and Nostrand",        b:"His Den",                c:"P and Coney Island",              d:"Brooklyn Commons",      correct:"a" },
+  { id:'d2q9', category:'Dress Code',           text:"His favorite place to shop is:",                                                                                                                       a:"H&M",                   b:"Zara",                   c:"Ziani",                           d:"Tobaldi",               correct:"c" },
+];
+
 const HARDCODED_DAY1 = [
   { id:'q1',  text: "What kind of engineer is Al D?",                    a:"Civil",                                    b:"Mechanical",                          c:"Structural",                               d:"Industrial",      correct:"c", order:1  },
-  { id:'q2',  text: "When is Al D's birthday?",                          a:"Dec 18",                                   b:"Dec 21",                              c:"Dec 22",                                   d:"Dec 27",          correct:"c", order:2  },
+  { id:'q2',  text: "When is Al D's birthday?",                          a:"Dec 18",                                   b:"Dec 27",                              c:"Dec 22",                                   d:"Dec 21",          correct:"c", order:2  },
   { id:'q3',  text: "Who is older — Al D or Sophia?",                    a:"Al D",                                     b:"Sophia",                              c:"They came out together",                   d:"They aren't really twins", correct:"b", order:3  },
   { id:'q4',  text: "Where did Al D go to college?",                     a:"Manhattan College – School of Engineering",b:"SUNY",                               c:"New York Institute of Technology",          d:"City Tech",       correct:"d", order:4  },
   { id:'q5',  text: "What is Al D's middle name?",                       a:"Sam",                                      b:"S",                                   c:"Stephen",                                  d:"M",               correct:"b", order:5  },
@@ -2816,9 +2846,21 @@ function loadGameData() {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderLeaderboard(window._lastGameScores);
   });
-  // App visibility settings — sync across all devices in real time
-  onSnapshot(doc(db, 'app_settings', 'visibility'), snap => {
+  // App visibility settings — read immediately on load + listen for real-time changes
+  const visRef = doc(db, 'app_settings', 'visibility');
+  getDoc(visRef).then(snap => { if (snap.exists()) applyVisibilitySettings(snap.data()); }).catch(()=>{});
+  onSnapshot(visRef, snap => {
     if (snap.exists()) applyVisibilitySettings(snap.data());
+  });
+
+  // Re-read settings when app comes back into focus (critical for home screen installs)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      getDoc(visRef).then(snap => { if (snap.exists()) applyVisibilitySettings(snap.data()); }).catch(()=>{});
+    }
+  });
+  window.addEventListener('focus', () => {
+    getDoc(visRef).then(snap => { if (snap.exists()) applyVisibilitySettings(snap.data()); }).catch(()=>{});
   });
   onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
     const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
