@@ -1876,26 +1876,36 @@ function spinWheel() {
   if (!cats.length) return;
   const btn = document.getElementById('spin-btn');
   if (btn) btn.disabled = true;
+  triviaState.answered = false;
 
   const spins = 5 + Math.floor(Math.random() * 5);
   const winIdx = Math.floor(Math.random() * cats.length);
   const slice = (2 * Math.PI) / cats.length;
-  // Calculate angle so pointer (top = -PI/2) lands on winIdx slice center
-  const targetAngle = winIdx * slice + slice / 2;
-  const totalAngle = spins * 2 * Math.PI + (2 * Math.PI - targetAngle - Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+
+  // Pointer is at the top (−π/2 in canvas coords).
+  // Slice i spans from (startAngle + i*slice) to (startAngle + (i+1)*slice).
+  // We want the CENTER of winIdx's slice to be under the pointer at the end.
+  // Final startAngle = −π/2 − (winIdx * slice + slice/2)
+  // We add full rotations on top, always rotating forward (positive direction).
+  const finalStart = -Math.PI / 2 - (winIdx * slice + slice / 2);
+  // Normalize so the delta from the initial −π/2 is always positive
+  let delta = finalStart - (-Math.PI / 2);
+  // Make delta negative (wheel spins clockwise visually = increasing angle)
+  // We want to go forward: add enough full rotations so delta > 0
+  delta = ((delta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const totalAngle = spins * 2 * Math.PI + delta;
+
   const duration = 3500;
   const start = performance.now();
-  let currentAngle = -Math.PI / 2;
 
   function animate(now) {
     const elapsed = now - start;
     const t = Math.min(elapsed / duration, 1);
     const ease = 1 - Math.pow(1 - t, 4);
-    currentAngle = -Math.PI / 2 + ease * totalAngle;
+    const currentAngle = -Math.PI / 2 + ease * totalAngle;
     drawWheel(cats, currentAngle);
     if (t < 1) { requestAnimationFrame(animate); return; }
-    // Winner is deterministic — winIdx
-    triviaState.wheelResult = cats[winIdx];
+    // Spin complete — show the winning category
     const spinsEl = document.getElementById('g-spins2');
     if (spinsEl) spinsEl.textContent = (parseInt(spinsEl.textContent) || 0) + 1;
     showWheelQuestion(cats[winIdx]);
@@ -1944,7 +1954,7 @@ function answerWheelQ(idx) {
   const fb = document.getElementById('wheel-feedback');
   if (fb) { fb.style.display = 'block'; fb.className = `trivia-feedback ${correct ? 'correct-fb' : 'wrong-fb'}`; fb.textContent = correct ? '✓ Correct!' : `✗ The answer was: ${correctText}`; }
   if (correct) { triviaState.correct++; const el = document.getElementById('g-correct2'); if (el) el.textContent = triviaState.correct; }
-  setTimeout(() => { const btn = document.getElementById('spin-btn'); if (btn) btn.disabled = false; }, 1200);
+  setTimeout(() => { const btn = document.getElementById('spin-btn'); if (btn) btn.disabled = false; }, 2000);
 }
 
 async function finishDay2() {
