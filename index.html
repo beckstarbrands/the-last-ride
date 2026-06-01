@@ -2526,16 +2526,14 @@ function toggleGameVisible() {
 function toggleMenuVisible() {
   menuVisible = !menuVisible;
   localStorage.setItem('tlr_menu_vis', menuVisible ? 'true' : 'false');
-  const menuTab = document.getElementById('tab-menu');
-  if (menuTab) {
-    const content = menuTab.querySelector('#menu-day-content');
-    const dayBtns = menuTab.querySelector('div[style*="display:flex"]');
-    const title = menuTab.querySelector('div[style*="padding:12px 12px 4px"]');
-    if (content) content.style.display = menuVisible ? '' : 'none';
-    if (dayBtns) dayBtns.style.display = menuVisible ? '' : 'none';
-    if (!menuVisible && content) content.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.<br>Stay tuned.</p></div>';
-    else if (menuVisible) renderMenuDay(currentMenuDay);
+  if (window._firebaseReady) {
+    const { doc, setDoc } = window._firebase;
+    setDoc(doc(window._db, 'app_settings', 'visibility'), { menuVisible }, { merge: true }).catch(()=>{});
   }
+  if (!menuVisible) {
+    const c = document.getElementById('menu-day-content');
+    if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.<br>Stay tuned.</p></div>';
+  } else renderMenuDay(currentMenuDay);
   renderAdminTab('grub');
 }
 
@@ -2791,18 +2789,28 @@ function loadGameData() {
   onSnapshot(doc(db, 'app_settings', 'visibility'), snap => {
     if (!snap.exists()) return;
     const data = snap.data();
-    if (data.dayVisibility) {
+
+    // Always apply — no condition checks that might skip updates
+    if (Array.isArray(data.dayVisibility)) {
       dayVisibility = data.dayVisibility;
       localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
       renderDayTabs();
       renderAgenda(currentDay);
     }
-    if (data.gameVisible !== undefined && data.gameVisible !== gameVisible) {
+    if (data.gameVisible !== undefined) {
       gameVisible = data.gameVisible;
       localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
       renderGameTab();
     }
-    if (data.pollVisible !== undefined && data.pollVisible !== pollVisible) {
+    if (data.menuVisible !== undefined) {
+      menuVisible = data.menuVisible;
+      localStorage.setItem('tlr_menu_vis', menuVisible ? 'true' : 'false');
+      if (!menuVisible) {
+        const c = document.getElementById('menu-day-content');
+        if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.</p></div>';
+      } else renderMenuDay(currentMenuDay);
+    }
+    if (data.pollVisible !== undefined) {
       pollVisible = data.pollVisible;
       localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
       const pollEl = document.getElementById('polls-container');
