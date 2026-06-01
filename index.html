@@ -998,6 +998,11 @@ function renderAgenda(idx) {
     agendaContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🤠</div><p>Agenda dropping soon.<br>Stay tuned, OGs.</p></div>';
     return;
   }
+  // If the requested day is hidden, jump to the first visible one
+  if (!dayVisibility[idx]) {
+    const first = dayVisibility.findIndex(v => v);
+    if (first >= 0) { currentDay = first; idx = first; }
+  }
   const d = getAgendaDay(idx);
   let html = `<div class="agenda-day-label">${d.day}</div>`;
   (d.events || []).forEach(ev => {
@@ -1518,6 +1523,7 @@ function getGameDay() {
 
 function setGameDay(val) {
   gameDayOverride = val === 'auto' ? null : val;
+  syncVisibilityToFirebase();
   ['auto',0,1,2].forEach(v => {
     const el = document.getElementById('gday-' + v);
     if (el) el.classList.toggle('active', v === (gameDayOverride ?? 'auto'));
@@ -1798,7 +1804,7 @@ async function renderDay2(container) {
 
 function startDay2Game() {
   const container = document.getElementById('game-container');
-  triviaState = { day: 1, correct: 0, startTime: Date.now(), answered: false, wheelResult: null, wheelUsed: [], _timerInterval: null, _finished: false };
+  triviaState = { day: 1, correct: 0, startTime: Date.now(), answered: false, wheelResult: null, wheelUsed: [], wheelCurrentAngle: -Math.PI / 2, _timerInterval: null, _finished: false };
   triviaState._timerInterval = setInterval(() => {
     const el = document.getElementById('g-timer2');
     if (el) el.textContent = Math.floor((Date.now() - triviaState.startTime) / 1000);
@@ -1871,8 +1877,18 @@ function drawWheel(cats, startAngle) {
   ctx.fillText('TLR', cx, cy + size * 0.012);
 }
 
+function getActiveCategories() {
+  // Return only categories that haven't been answered yet
+  const usedCatNames = new Set(
+    HARDCODED_DAY2_QUESTIONS
+      .filter(q => triviaState.wheelUsed.includes(q.id))
+      .map(q => q.category)
+  );
+  return HARDCODED_DAY2_CATEGORIES.filter(c => !usedCatNames.has(c.name));
+}
+
 function spinWheel() {
-  var cats = HARDCODED_DAY2_CATEGORIES;
+  var cats = getActiveCategories();
   if (!cats.length) return;
   var btn = document.getElementById('spin-btn');
   if (btn) btn.disabled = true;
@@ -1887,7 +1903,7 @@ function spinWheel() {
   //   startAngle + winIdx*slice + slice/2 = -PI/2  (mod 2PI)
   //   finalStartAngle = -PI/2 - winIdx*slice - slice/2
   // Wheel spins forward (angle increases). Compute positive delta from -PI/2.
-  var initialStart = -Math.PI / 2;
+  var initialStart = triviaState.wheelCurrentAngle !== undefined ? triviaState.wheelCurrentAngle : -Math.PI / 2;
   var finalStart = -Math.PI / 2 - winIdx * slice - slice / 2;
   var delta = finalStart - initialStart;
   delta = ((delta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -1900,8 +1916,10 @@ function spinWheel() {
     var elapsed = now - start;
     var t = Math.min(elapsed / duration, 1);
     var ease = 1 - Math.pow(1 - t, 4);
-    drawWheel(cats, initialStart + ease * totalAngle);
+    var angle = initialStart + ease * totalAngle;
+    drawWheel(cats, angle);
     if (t < 1) { requestAnimationFrame(animate); return; }
+    triviaState.wheelCurrentAngle = -Math.PI / 2 - winIdx * slice - slice / 2;
     var spinsEl = document.getElementById('g-spins2');
     if (spinsEl) spinsEl.textContent = (parseInt(spinsEl.textContent) || 0) + 1;
     showWheelQuestion(cats[winIdx]);
@@ -1950,12 +1968,25 @@ function answerWheelQ(idx) {
   const fb = document.getElementById('wheel-feedback');
   if (fb) { fb.style.display = 'block'; fb.className = `trivia-feedback ${correct ? 'correct-fb' : 'wrong-fb'}`; fb.textContent = correct ? '✓ Correct!' : `✗ The answer was: ${correctText}`; }
   if (correct) { triviaState.correct++; const el = document.getElementById('g-correct2'); if (el) el.textContent = triviaState.correct; }
-  setTimeout(() => { const btn = document.getElementById('spin-btn'); if (btn) btn.disabled = false; }, 2000);
-  // Show finish button once all 9 questions have been answered
-  if (triviaState.wheelUsed.length >= HARDCODED_DAY2_QUESTIONS.length) {
-    const fb = document.getElementById('finish-day2-btn');
-    if (fb) { fb.style.display = 'block'; fb.textContent = 'All Done! See Your Score 🏆'; }
-  }
+  // Redraw wheel with this category removed
+  setTimeout(() => {
+    const remaining = getActiveCategories();
+    if (remaining.length > 0) {
+      // Reset angle so the smaller wheel starts cleanly at top
+      triviaState.wheelCurrentAngle = -Math.PI / 2;
+      drawWheel(remaining, -Math.PI / 2);
+      const btn = document.getElementById('spin-btn');
+      if (btn) btn.disabled = false;
+    } else {
+      // All categories done — show finish button, hide spin
+      const spinBtn = document.getElementById('spin-btn');
+      if (spinBtn) spinBtn.style.display = 'none';
+    }
+    if (triviaState.wheelUsed.length >= HARDCODED_DAY2_QUESTIONS.length) {
+      const fb = document.getElementById('finish-day2-btn');
+      if (fb) { fb.style.display = 'block'; fb.textContent = 'All Done! See Your Score 🏆'; }
+    }
+  }, 2000);
 }
 
 async function finishDay2() {
@@ -2636,7 +2667,8 @@ function syncVisibilityToFirebase() {
   if (!window._firebaseReady) return;
   const { doc, setDoc } = window._firebase;
   setDoc(doc(window._db, 'app_settings', 'visibility'), {
-    dayVisibility, gameVisible, menuVisible, pollVisible
+    dayVisibility, gameVisible, menuVisible, pollVisible,
+    gameDay: gameDayOverride === null ? 'auto' : gameDayOverride
   }).catch(e => console.error('Visibility sync error:', e));
 }
 
@@ -2645,8 +2677,20 @@ function applyVisibilitySettings(data) {
   if (Array.isArray(data.dayVisibility)) {
     dayVisibility = data.dayVisibility;
     localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
+    // If currentDay is now hidden, move to first visible day
+    if (!dayVisibility[currentDay]) {
+      const first = dayVisibility.findIndex(v => v);
+      if (first >= 0) currentDay = first;
+    }
     renderDayTabs();
     renderAgenda(currentDay);
+  }
+  if (data.gameDay !== undefined) {
+    const newGameDay = data.gameDay === 'auto' ? null : data.gameDay;
+    if (newGameDay !== gameDayOverride) {
+      gameDayOverride = newGameDay;
+      renderGameTab();
+    }
   }
   if (data.gameVisible !== undefined) {
     gameVisible = data.gameVisible;
