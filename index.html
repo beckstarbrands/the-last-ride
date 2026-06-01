@@ -1798,40 +1798,45 @@ async function renderDay2(container) {
 
 function startDay2Game() {
   const container = document.getElementById('game-container');
-  triviaState = { day: 1, correct: 0, startTime: Date.now(), answered: false, wheelResult: null, wheelUsed: [], _timerInterval: null };
+  triviaState = { day: 1, correct: 0, startTime: Date.now(), answered: false, wheelResult: null, wheelUsed: [], _timerInterval: null, _finished: false };
   triviaState._timerInterval = setInterval(() => {
     const el = document.getElementById('g-timer2');
     if (el) el.textContent = Math.floor((Date.now() - triviaState.startTime) / 1000);
   }, 1000);
 
+  const size = Math.min(window.innerWidth - 32, 340);
+
   container.innerHTML = `
-    <div class="game-header">
-      <div class="game-title-big">Spin the Wheel</div>
-      <div class="game-subtitle">Day 2 · Al D Category Trivia</div>
+    <div style="text-align:center;padding:12px 0 8px;">
+      <div style="font-family:'Rye',cursive;font-size:22px;color:var(--gold);">Spin the Wheel</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Day 2 · Al D Category Trivia</div>
     </div>
-    <div class="game-stats">
+    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:12px;">
       <div class="stat-box"><div class="stat-val" id="g-correct2">0</div><div class="stat-lbl">Correct</div></div>
       <div class="stat-box"><div class="stat-val" id="g-spins2">0</div><div class="stat-lbl">Spins</div></div>
       <div class="stat-box"><div class="stat-val" id="g-timer2">0</div><div class="stat-lbl">Seconds</div></div>
     </div>
-    <div class="wheel-wrap">
-      <div class="wheel-pointer">▼</div>
-      <canvas class="wheel-canvas" id="wheel-canvas" width="260" height="260"></canvas>
-      <button class="spin-btn" id="spin-btn" onclick="spinWheel()">Spin It!</button>
+    <div style="position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:12px;">
+      <div style="font-size:22px;color:var(--bronze);margin-bottom:-8px;z-index:2;">▼</div>
+      <canvas id="wheel-canvas" width="${size}" height="${size}" style="display:block;border-radius:50%;box-shadow:0 4px 24px rgba(200,135,58,0.25);"></canvas>
     </div>
+    <button class="submit-btn" id="spin-btn" onclick="spinWheel()" style="margin-bottom:8px;">Spin It!</button>
     <div id="wheel-question-area"></div>
-    <button class="submit-btn" onclick="finishDay2()" style="margin-top:8px;">Finish & See Score</button>`;
-  drawWheel(HARDCODED_DAY2_CATEGORIES, -Math.PI / 2);
+    <button class="submit-btn" onclick="finishDay2()" style="background:rgba(200,135,58,0.15);border:1px solid var(--bronze);color:var(--bronze);margin-top:4px;">Finish & See Score</button>`;
+
+  // Use setTimeout to ensure canvas is in DOM before drawing
+  setTimeout(() => drawWheel(HARDCODED_DAY2_CATEGORIES, -Math.PI / 2), 50);
 }
 
 function drawWheel(cats, startAngle) {
   const canvas = document.getElementById('wheel-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const cx = 130, cy = 130, r = 120;
+  const size = canvas.width;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 4;
   const slice = (2 * Math.PI) / cats.length;
-  const colors = ['#3a2410','#4a2e14','#5a3818','#6a421c','#7a4c20','#8a5624'];
-  ctx.clearRect(0, 0, 260, 260);
+  const colors = ['#3a2410','#4a2e14','#5a3818','#6a421c','#7a4c20','#8a5624','#4e3218','#603c1c','#523416'];
+  ctx.clearRect(0, 0, size, size);
   cats.forEach((cat, i) => {
     const a0 = startAngle + i * slice;
     const a1 = a0 + slice;
@@ -1841,28 +1846,29 @@ function drawWheel(cats, startAngle) {
     ctx.closePath();
     ctx.fillStyle = colors[i % colors.length];
     ctx.fill();
-    ctx.strokeStyle = 'rgba(200,135,58,0.5)';
+    ctx.strokeStyle = '#c8873a';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    // Label
+    // Label — no emoji, just text
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(a0 + slice / 2);
     ctx.fillStyle = '#e8b84b';
-    ctx.font = `bold 13px DM Sans, sans-serif`;
+    const fontSize = size < 300 ? 11 : 13;
+    ctx.font = `bold ${fontSize}px DM Sans, sans-serif`;
     ctx.textAlign = 'right';
-    ctx.fillText((cat.emoji || '★') + ' ' + cat.name, r - 10, 5);
+    ctx.fillText(cat.name, r - 12, 5);
     ctx.restore();
   });
   // Center circle
   ctx.beginPath();
-  ctx.arc(cx, cy, 18, 0, 2 * Math.PI);
+  ctx.arc(cx, cy, size * 0.07, 0, 2 * Math.PI);
   ctx.fillStyle = '#c8873a';
   ctx.fill();
   ctx.fillStyle = '#120b05';
-  ctx.font = 'bold 10px Rye, cursive';
+  ctx.font = `bold ${Math.round(size * 0.035)}px Rye, cursive`;
   ctx.textAlign = 'center';
-  ctx.fillText('TLR', cx, cy + 4);
+  ctx.fillText('TLR', cx, cy + size * 0.012);
 }
 
 function spinWheel() {
@@ -1871,27 +1877,24 @@ function spinWheel() {
   const btn = document.getElementById('spin-btn');
   if (btn) btn.disabled = true;
 
-  const spins = 5 + Math.random() * 5;
-  const extra = Math.floor(Math.random() * cats.length);
-  const totalAngle = spins * 2 * Math.PI + extra * (2 * Math.PI / cats.length);
-  const duration = 3000;
+  const spins = 5 + Math.floor(Math.random() * 5);
+  const winIdx = Math.floor(Math.random() * cats.length);
+  const slice = (2 * Math.PI) / cats.length;
+  // Calculate angle so pointer (top = -PI/2) lands on winIdx slice center
+  const targetAngle = winIdx * slice + slice / 2;
+  const totalAngle = spins * 2 * Math.PI + (2 * Math.PI - targetAngle - Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+  const duration = 3500;
   const start = performance.now();
-  const startAngle = -Math.PI / 2;
+  let currentAngle = -Math.PI / 2;
 
   function animate(now) {
     const elapsed = now - start;
     const t = Math.min(elapsed / duration, 1);
-    const ease = 1 - Math.pow(1 - t, 3);
-    const angle = startAngle + ease * totalAngle;
-    drawWheel(cats, angle);
+    const ease = 1 - Math.pow(1 - t, 4);
+    currentAngle = -Math.PI / 2 + ease * totalAngle;
+    drawWheel(cats, currentAngle);
     if (t < 1) { requestAnimationFrame(animate); return; }
-    // Determine winner — pointer is at top (startAngle)
-    const finalAngle = ((startAngle + totalAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const slice = (2 * Math.PI) / cats.length;
-    // Pointer is at top = angle 0 on canvas but we rotated by startAngle
-    const pointerAngle = ((-startAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const normalizedFinal = (finalAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const winIdx = Math.floor(((2 * Math.PI - normalizedFinal + pointerAngle + slice / 2) % (2 * Math.PI)) / slice) % cats.length;
+    // Winner is deterministic — winIdx
     triviaState.wheelResult = cats[winIdx];
     const spinsEl = document.getElementById('g-spins2');
     if (spinsEl) spinsEl.textContent = (parseInt(spinsEl.textContent) || 0) + 1;
@@ -1945,6 +1948,8 @@ function answerWheelQ(idx) {
 }
 
 async function finishDay2() {
+  if (triviaState._finished) { showToast('Already submitted!'); return; }
+  triviaState._finished = true;
   clearInterval(triviaState._timerInterval);
   const elapsed = Math.floor((Date.now() - triviaState.startTime) / 1000);
   const spinsEl = document.getElementById('g-spins2');
