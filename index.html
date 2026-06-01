@@ -1516,7 +1516,8 @@ function getGameDay() {
   const june4 = new Date('2026-06-04');
   if (now >= june4) return 2;
   if (now >= june3) return 1;
-  return 0; // Default to Day 1 (including before June 2)
+  if (now >= june2) return 0;
+  return -1; // Before the trip — game not available yet
 }
 
 function setGameDay(val) {
@@ -1540,6 +1541,10 @@ function renderGameTab() {
     return;
   }
 
+  if (day === -1) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><p>Games go live June 2nd.<br>See you in Dallas! 🤠</p></div>`;
+    return;
+  }
   if (day === 0) renderDay1(container);
   else if (day === 1) renderDay2(container);
   else renderDay3(container);
