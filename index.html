@@ -2515,10 +2515,7 @@ function renderScoringTab() {
 function toggleGameVisible() {
   gameVisible = !gameVisible;
   localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
-  if (window._firebaseReady) {
-    const { doc, setDoc } = window._firebase;
-    setDoc(doc(window._db, 'app_settings', 'visibility'), { gameVisible }, { merge: true }).catch(()=>{});
-  }
+  syncVisibilityToFirebase();
   renderGameTab();
   renderAdminTab('game');
 }
@@ -2526,10 +2523,7 @@ function toggleGameVisible() {
 function toggleMenuVisible() {
   menuVisible = !menuVisible;
   localStorage.setItem('tlr_menu_vis', menuVisible ? 'true' : 'false');
-  if (window._firebaseReady) {
-    const { doc, setDoc } = window._firebase;
-    setDoc(doc(window._db, 'app_settings', 'visibility'), { menuVisible }, { merge: true }).catch(()=>{});
-  }
+  syncVisibilityToFirebase();
   if (!menuVisible) {
     const c = document.getElementById('menu-day-content');
     if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.<br>Stay tuned.</p></div>';
@@ -2540,10 +2534,7 @@ function toggleMenuVisible() {
 function togglePollVisible() {
   pollVisible = !pollVisible;
   localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
-  if (window._firebaseReady) {
-    const { doc, setDoc } = window._firebase;
-    setDoc(doc(window._db, 'app_settings', 'visibility'), { pollVisible }, { merge: true }).catch(()=>{});
-  }
+  syncVisibilityToFirebase();
   const pollEl = document.getElementById('polls-container');
   if (pollEl) {
     if (!pollVisible) pollEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗳️</div><p>Poll coming soon.</p></div>';
@@ -2592,6 +2583,46 @@ async function deleteActivityEntry(id, type) {
   }
   renderActivityTab();
   showToast('Entry removed');
+}
+
+function syncVisibilityToFirebase() {
+  if (!window._firebaseReady) return;
+  const { doc, setDoc } = window._firebase;
+  setDoc(doc(window._db, 'app_settings', 'visibility'), {
+    dayVisibility, gameVisible, menuVisible, pollVisible
+  }).catch(e => console.error('Visibility sync error:', e));
+}
+
+function applyVisibilitySettings(data) {
+  if (!data) return;
+  if (Array.isArray(data.dayVisibility)) {
+    dayVisibility = data.dayVisibility;
+    localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
+    renderDayTabs();
+    renderAgenda(currentDay);
+  }
+  if (data.gameVisible !== undefined) {
+    gameVisible = data.gameVisible;
+    localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
+    renderGameTab();
+  }
+  if (data.menuVisible !== undefined) {
+    menuVisible = data.menuVisible;
+    localStorage.setItem('tlr_menu_vis', menuVisible ? 'true' : 'false');
+    if (!menuVisible) {
+      const c = document.getElementById('menu-day-content');
+      if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.<br>Stay tuned.</p></div>';
+    } else renderMenuDay(currentMenuDay);
+  }
+  if (data.pollVisible !== undefined) {
+    pollVisible = data.pollVisible;
+    localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
+    const pollEl = document.getElementById('polls-container');
+    if (pollEl) {
+      if (!pollVisible) pollEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗳️</div><p>Poll coming soon.</p></div>';
+      else renderPolls(window._cachedPolls || []);
+    }
+  }
 }
 
 function renderLeaderboard(scores) {
@@ -2785,40 +2816,9 @@ function loadGameData() {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderLeaderboard(window._lastGameScores);
   });
-  // App visibility settings — sync across all devices
+  // App visibility settings — sync across all devices in real time
   onSnapshot(doc(db, 'app_settings', 'visibility'), snap => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-
-    // Always apply — no condition checks that might skip updates
-    if (Array.isArray(data.dayVisibility)) {
-      dayVisibility = data.dayVisibility;
-      localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
-      renderDayTabs();
-      renderAgenda(currentDay);
-    }
-    if (data.gameVisible !== undefined) {
-      gameVisible = data.gameVisible;
-      localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
-      renderGameTab();
-    }
-    if (data.menuVisible !== undefined) {
-      menuVisible = data.menuVisible;
-      localStorage.setItem('tlr_menu_vis', menuVisible ? 'true' : 'false');
-      if (!menuVisible) {
-        const c = document.getElementById('menu-day-content');
-        if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">🍽️</div><p>Menu dropping soon.</p></div>';
-      } else renderMenuDay(currentMenuDay);
-    }
-    if (data.pollVisible !== undefined) {
-      pollVisible = data.pollVisible;
-      localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
-      const pollEl = document.getElementById('polls-container');
-      if (pollEl) {
-        if (!pollVisible) pollEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗳️</div><p>Poll coming soon.</p></div>';
-        else renderPolls(window._cachedPolls || []);
-      }
-    }
+    if (snap.exists()) applyVisibilitySettings(snap.data());
   });
   onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
     const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -3142,10 +3142,7 @@ function toggleDay(idx) {
   if (el) el.classList.toggle('on');
   dayVisibility[idx] = !dayVisibility[idx];
   localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
-  if (window._firebaseReady) {
-    const { doc, setDoc } = window._firebase;
-    setDoc(doc(window._db, 'app_settings', 'visibility'), { dayVisibility }, { merge: true }).catch(()=>{});
-  }
+  syncVisibilityToFirebase();
   renderDayTabs();
   if (!dayVisibility[currentDay]) {
     const first = dayVisibility.findIndex(v => v);
