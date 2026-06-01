@@ -1536,7 +1536,7 @@ function renderGameTab() {
 }
 
 // ── DAY 1: TRIVIA ────────────────────────────
-function renderDay1(container) {
+async function renderDay1(container) {
   const qs = HARDCODED_DAY1.sort((a,b) => (a.order||99) - (b.order||99));
   if (!qs.length) {
     container.innerHTML = `
@@ -1548,7 +1548,7 @@ function renderDay1(container) {
     return;
   }
   // Already played check
-  if (hasPlayedToday()) {
+  if (await hasPlayedToday()) {
     container.innerHTML = `
       <div class="game-header">
         <div class="game-title-big">Who Knows Al D?</div>
@@ -1735,7 +1735,7 @@ async function showTriviaResults() {
 }
 
 // ── DAY 2: SPIN THE WHEEL ────────────────────
-function renderDay2(container) {
+async function renderDay2(container) {
   const cats = wheelCategories;
   if (!cats.length) {
     container.innerHTML = `
@@ -1747,7 +1747,7 @@ function renderDay2(container) {
     return;
   }
   // Already played check
-  if (hasPlayedToday()) {
+  if (await hasPlayedToday()) {
     container.innerHTML = `
       <div class="game-header">
         <div class="game-title-big">Spin the Wheel</div>
@@ -1979,7 +1979,7 @@ async function finishDay2() {
 }
 
 // ── DAY 3: LIGHTNING TRUE/FALSE ──────────────
-function renderDay3(container) {
+async function renderDay3(container) {
   const qs = triviaQuestions[2] || [];
   if (!qs.length) {
     container.innerHTML = `
@@ -1988,7 +1988,7 @@ function renderDay3(container) {
     return;
   }
   // Already played check
-  if (hasPlayedToday()) {
+  if (await hasPlayedToday()) {
     container.innerHTML = `
       <div class="game-header">
         <div class="game-title-big">Lightning Round</div>
@@ -2137,22 +2137,47 @@ async function showLightningResults() {
 // ── SAVE SCORE ───────────────────────────────
 async function saveGameScore(score, detail) {
   if (!currentUser || !window._firebaseReady) return;
-  const { collection, addDoc, serverTimestamp } = window._firebase;
+  const { collection, addDoc, serverTimestamp, doc, setDoc } = window._firebase;
+
+  // Save score to Firestore
   await addDoc(collection(window._db, 'game_scores'), {
-    name: currentUser.name, avatar: currentUser.avatar,
+    name: currentUser.name, avatar: currentUser.avatar || '',
     score, detail, day: getGameDay(),
     createdAt: serverTimestamp()
   });
-  // Mark this day as played for this user
+
+  // Mark as played in Firestore (per user per day)
+  const playedKey = currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '_day' + getGameDay();
+  await setDoc(doc(window._db, 'game_played', playedKey), {
+    name: currentUser.name, day: getGameDay(), ts: serverTimestamp()
+  }).catch(()=>{});
+
+  // Also localStorage as fast local cache
   const played = JSON.parse(localStorage.getItem('tlr_played') || '{}');
   played[currentUser.name + '_day' + getGameDay()] = true;
   localStorage.setItem('tlr_played', JSON.stringify(played));
 }
 
-function hasPlayedToday() {
+async function hasPlayedToday() {
   if (!currentUser) return false;
+  // Check localStorage first (fast)
   const played = JSON.parse(localStorage.getItem('tlr_played') || '{}');
-  return !!played[currentUser.name + '_day' + getGameDay()];
+  if (played[currentUser.name + '_day' + getGameDay()]) return true;
+  // Check Firestore (authoritative — catches different devices)
+  if (window._firebaseReady) {
+    const { doc, getDoc } = window._firebase;
+    const playedKey = currentUser.name.replace(/[^a-zA-Z0-9]/g,'_') + '_day' + getGameDay();
+    try {
+      const snap = await getDoc(doc(window._db, 'game_played', playedKey));
+      if (snap.exists()) {
+        // Cache locally so next check is fast
+        played[currentUser.name + '_day' + getGameDay()] = true;
+        localStorage.setItem('tlr_played', JSON.stringify(played));
+        return true;
+      }
+    } catch(e) {}
+  }
+  return false;
 }
 
 // ── HARDCODED GAME QUESTIONS ─────────────────
@@ -2490,6 +2515,10 @@ function renderScoringTab() {
 function toggleGameVisible() {
   gameVisible = !gameVisible;
   localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
+  if (window._firebaseReady) {
+    const { doc, setDoc } = window._firebase;
+    setDoc(doc(window._db, 'app_settings', 'visibility'), { gameVisible }, { merge: true }).catch(()=>{});
+  }
   renderGameTab();
   renderAdminTab('game');
 }
@@ -2513,6 +2542,10 @@ function toggleMenuVisible() {
 function togglePollVisible() {
   pollVisible = !pollVisible;
   localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
+  if (window._firebaseReady) {
+    const { doc, setDoc } = window._firebase;
+    setDoc(doc(window._db, 'app_settings', 'visibility'), { pollVisible }, { merge: true }).catch(()=>{});
+  }
   const pollEl = document.getElementById('polls-container');
   if (pollEl) {
     if (!pollVisible) pollEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗳️</div><p>Poll coming soon.</p></div>';
@@ -2521,17 +2554,24 @@ function togglePollVisible() {
   renderAdminTab('grub');
 }
 
-function renderWhoPlayed() {
+async function renderWhoPlayed() {
   const el = document.getElementById('admin-who-played');
   if (!el) return;
-  const played = JSON.parse(localStorage.getItem('tlr_played') || '{}');
-  const scores = window._lastGameScores || [];
-  const dayLabels = ['Day 1 · Who Knows Al D?', 'Day 2 · Spin the Wheel', 'Day 3 · Lightning Round'];
 
+  let playedKeys = {};
+  if (window._firebaseReady) {
+    const { collection, getDocs } = window._firebase;
+    const snap = await getDocs(collection(window._db, 'game_played'));
+    snap.docs.forEach(d => { playedKeys[d.id] = true; });
+  } else {
+    playedKeys = JSON.parse(localStorage.getItem('tlr_played') || '{}');
+  }
+
+  const dayLabels = ['Day 1 · Who Knows Al D?', 'Day 2 · Spin the Wheel', 'Day 3 · Lightning Round'];
   let html = '';
   [0,1,2].forEach(day => {
-    const playedCrew = CREW.filter(n => played[n + '_day' + day]);
-    const notPlayed = CREW.filter(n => !played[n + '_day' + day]);
+    const playedCrew = CREW.filter(n => playedKeys[n.replace(/[^a-zA-Z0-9]/g,'_') + '_day' + day] || playedKeys[n + '_day' + day]);
+    const notPlayed = CREW.filter(n => !playedKeys[n.replace(/[^a-zA-Z0-9]/g,'_') + '_day' + day] && !playedKeys[n + '_day' + day]);
     html += `<div style="margin-bottom:12px;">
       <div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">${dayLabels[day]}</div>
       ${playedCrew.length ? playedCrew.map(n => `<span style="display:inline-block;background:rgba(40,120,60,0.2);border:1px solid rgba(60,180,80,0.3);border-radius:12px;padding:2px 8px;font-size:11px;color:#7de89a;margin:2px;">${CREW_EMOJI[n]||''} ${n.split(' ')[0]} ✓</span>`).join('') : '<span style="font-size:11px;color:var(--muted);">Nobody yet</span>'}
@@ -2656,8 +2696,14 @@ async function resetGameScores() {
   localStorage.removeItem('tlr_played');
   if (window._firebaseReady) {
     const { collection, getDocs, deleteDoc, doc } = window._firebase;
-    const snap = await getDocs(collection(window._db, 'game_scores'));
-    await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'game_scores', d.id))));
+    const [scoreSnap, playedSnap] = await Promise.all([
+      getDocs(collection(window._db, 'game_scores')),
+      getDocs(collection(window._db, 'game_played'))
+    ]);
+    await Promise.all([
+      ...scoreSnap.docs.map(d => deleteDoc(doc(window._db, 'game_scores', d.id))),
+      ...playedSnap.docs.map(d => deleteDoc(doc(window._db, 'game_played', d.id)))
+    ]);
   }
   window._lastGameScores = [];
   renderLeaderboard(window._lastGameScores || []);
@@ -2741,7 +2787,31 @@ function loadGameData() {
     window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderLeaderboard(window._lastGameScores);
   });
-  // Bonus awards — Firebase is the single source of truth
+  // App visibility settings — sync across all devices
+  onSnapshot(doc(db, 'app_settings', 'visibility'), snap => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.dayVisibility) {
+      dayVisibility = data.dayVisibility;
+      localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
+      renderDayTabs();
+      renderAgenda(currentDay);
+    }
+    if (data.gameVisible !== undefined && data.gameVisible !== gameVisible) {
+      gameVisible = data.gameVisible;
+      localStorage.setItem('tlr_game_vis', gameVisible ? 'true' : 'false');
+      renderGameTab();
+    }
+    if (data.pollVisible !== undefined && data.pollVisible !== pollVisible) {
+      pollVisible = data.pollVisible;
+      localStorage.setItem('tlr_poll_vis', pollVisible ? 'true' : 'false');
+      const pollEl = document.getElementById('polls-container');
+      if (pollEl) {
+        if (!pollVisible) pollEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗳️</div><p>Poll coming soon.</p></div>';
+        else renderPolls(window._cachedPolls || []);
+      }
+    }
+  });
   onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
     const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     window._cachedAwards = firebaseAwards;
@@ -3064,8 +3134,11 @@ function toggleDay(idx) {
   if (el) el.classList.toggle('on');
   dayVisibility[idx] = !dayVisibility[idx];
   localStorage.setItem('tlr_dayvis', JSON.stringify(dayVisibility));
+  if (window._firebaseReady) {
+    const { doc, setDoc } = window._firebase;
+    setDoc(doc(window._db, 'app_settings', 'visibility'), { dayVisibility }, { merge: true }).catch(()=>{});
+  }
   renderDayTabs();
-  // If currently viewing a now-hidden day, jump to first visible
   if (!dayVisibility[currentDay]) {
     const first = dayVisibility.findIndex(v => v);
     if (first >= 0) switchDay(first);
