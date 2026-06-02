@@ -921,10 +921,6 @@ function loadFromFirebase() {
     renderMenu(window._cachedMeals);
     renderAdminMealList();
   });
-  onSnapshot(query(collection(db, 'game_scores'), orderBy('score', 'desc')), snap => {
-    window._lastGameScores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderLeaderboard(window._lastGameScores);
-  });
   loadAgendaFromFirebase();
   loadGameData();
 
@@ -945,7 +941,6 @@ function switchTab(tab) {
   document.getElementById('nav-' + tab).classList.add('active');
   if (tab === 'agenda') renderAgenda(currentDay);
   if (tab === 'leaderboard') {
-    window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
     renderLeaderboard(window._lastGameScores || []);
     const actEl = document.getElementById('leaderboard-activity');
     if (actEl && actEl.style.display !== 'none') renderActivityTab();
@@ -954,7 +949,6 @@ function switchTab(tab) {
     window._lbRefreshInterval = setInterval(() => {
       const lbTab = document.getElementById('tab-leaderboard');
       if (lbTab && lbTab.classList.contains('active')) {
-        window._cachedAwards = JSON.parse(localStorage.getItem('tlr_awards') || '[]');
         renderLeaderboard(window._lastGameScores || []);
       } else {
         clearInterval(window._lbRefreshInterval);
