@@ -1319,22 +1319,25 @@ function renderMenuDay(idx) {
 // ── MEALS (Firebase ordering — now unused but kept for compatibility) ─
 function renderPolls(polls) {
   const el = document.getElementById('polls-container');
-  const active = polls.find(p => p.active);
-  if (!active) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗳️</div><p>No active poll right now.</p></div>`; return; }
-  const votes = active.votes || {};
-  const myVote = votes[currentUser?.id];
-  const total = Object.keys(votes).length;
-  let html = `<div class="poll-question">${active.question}</div>`;
-  active.options.forEach((opt, i) => {
-    const count = Object.values(votes).filter(v => v === i).length;
-    const pct = total ? Math.round((count / total) * 100) : 0;
-    html += `<div class="poll-option ${myVote === i ? 'selected' : ''} ${myVote !== undefined ? 'voted' : ''}" onclick="votePoll('${active.id}', ${i})">
-      <span>${opt}</span>${myVote !== undefined ? `<span class="poll-pct">${pct}%</span>` : ''}
-    </div>
-    ${myVote !== undefined ? `<div class="poll-bar-wrap"><div class="poll-bar" style="width:${pct}%"></div></div>` : ''}`;
-  });
-  if (myVote !== undefined) html += `<div class="poll-total">${total} vote${total !== 1 ? 's' : ''}</div>`;
-  el.innerHTML = html;
+  const activePolls = polls.filter(p => p.active);
+  if (!activePolls.length) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗳️</div><p>No active poll right now.</p></div>`; return; }
+  el.innerHTML = activePolls.map(active => {
+    const votes = active.votes || {};
+    const myVote = votes[currentUser?.id];
+    const total = Object.keys(votes).length;
+    let html = `<div class="card" style="margin-bottom:12px;"><div class="poll-question">${active.question}</div>`;
+    active.options.forEach((opt, i) => {
+      const count = Object.values(votes).filter(v => v === i).length;
+      const pct = total ? Math.round((count / total) * 100) : 0;
+      html += `<div class="poll-option ${myVote === i ? 'selected' : ''} ${myVote !== undefined ? 'voted' : ''}" onclick="votePoll('${active.id}', ${i})">
+        <span>${opt}</span>${myVote !== undefined ? `<span class="poll-pct">${pct}%</span>` : ''}
+      </div>
+      ${myVote !== undefined ? `<div class="poll-bar-wrap"><div class="poll-bar" style="width:${pct}%"></div></div>` : ''}`;
+    });
+    if (myVote !== undefined) html += `<div class="poll-total">${total} vote${total !== 1 ? 's' : ''}</div>`;
+    html += `</div>`;
+    return html;
+  }).join('');
 }
 async function votePoll(pollId, idx) {
   if (!currentUser || userVotes[pollId] !== undefined) { showToast('Already voted!'); return; }
