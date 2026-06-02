@@ -921,6 +921,16 @@ function loadFromFirebase() {
     renderMenu(window._cachedMeals);
     renderAdminMealList();
   });
+  // Real-time listener for bonus awards — runs for ALL users
+  onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
+    const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window._cachedAwards = firebaseAwards;
+    localStorage.setItem('tlr_awards', JSON.stringify(firebaseAwards));
+    renderLeaderboard(window._lastGameScores || []);
+    const actEl = document.getElementById('leaderboard-activity');
+    if (actEl && actEl.style.display !== 'none') renderActivityTab();
+  });
+
   loadAgendaFromFirebase();
   loadGameData();
 
@@ -2932,15 +2942,6 @@ function loadGameData() {
   });
   window.addEventListener('focus', () => {
     getDoc(visRef).then(snap => { if (snap.exists()) applyVisibilitySettings(snap.data()); }).catch(()=>{});
-  });
-  onSnapshot(query(collection(db, 'bonus_awards'), orderBy('ts', 'asc')), snap => {
-    const firebaseAwards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    window._cachedAwards = firebaseAwards;
-    // Sync to localStorage as cache only
-    localStorage.setItem('tlr_awards', JSON.stringify(firebaseAwards));
-    renderLeaderboard(window._lastGameScores || []);
-    const actEl = document.getElementById('leaderboard-activity');
-    if (actEl && actEl.style.display !== 'none') renderActivityTab();
   });
 }
 
