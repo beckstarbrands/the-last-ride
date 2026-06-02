@@ -1520,9 +1520,9 @@ let triviaState = {
 function getGameDay() {
   if (gameDayOverride !== null) return gameDayOverride;
   const now = new Date();
-  const june2 = new Date('2026-06-02');
-  const june3 = new Date('2026-06-03');
-  const june4 = new Date('2026-06-04');
+  const june2 = new Date('2026-06-02T05:00:00Z'); // midnight CT (UTC-5)
+  const june3 = new Date('2026-06-03T05:00:00Z');
+  const june4 = new Date('2026-06-04T05:00:00Z');
   if (now >= june4) return 2;
   if (now >= june3) return 1;
   if (now >= june2) return 0;
